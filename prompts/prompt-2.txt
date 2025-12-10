@@ -282,5 +282,3 @@ funkcjonalności. Komentarze w kodzie po polsku, kod po angielsku.
 ```
 
 ---
-
-**Uwaga**: Ten prompt można skopiować i użyć do dalszej pracy nad projektem!
