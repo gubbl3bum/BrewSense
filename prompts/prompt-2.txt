@@ -1,0 +1,286 @@
+# Prompt do Ulepszenia GUI Aplikacji BrewSense
+
+## Cel
+Poprawić wygląd interfejsu graficznego aplikacji BrewSense, ze szczególnym uwzględnieniem problemu z uciętym ekranem kawy oraz ogólnej estetyki aplikacji.
+
+## Problemy do rozwiązania
+
+### 1. Problem z kubkiem kawy (PRIORYTET)
+- **Aktualny problem**: Kubek jest ucięty w dolnej części - nie widać pełnego obrazu
+- **Oczekiwane**: Cały kubek powinien być widoczny wraz ze spodkiem i opisem jakości
+- **Canvas**: Zwiększyć wysokość canvas lub lepiej zarządzać przestrzenią
+
+### 2. Ogólne ulepszenia wizualne
+- Lepsza kolorystyka i kontrast
+- Lepsze proporcje między panelami
+- Bardziej profesjonalny wygląd
+- Czytelniejsze fonty i odstępy
+
+## Szczegółowe wymagania
+
+### Panel prawy (Wizualizacja kubka)
+
+#### Problemy do naprawy:
+1. **Kubek ucięty** - zwiększyć wysokość canvas z 400 do ~500-550px
+2. **Tekst pod kubkiem** niewidoczny lub ucięty
+3. **Para nad kubkiem** czasami wychodzi poza canvas
+
+#### Propozycje ulepszeń:
+```python
+# Zwiększenie rozmiaru canvas
+self.canvas_height = 550  # było 400
+self.canvas_width = 350   # może zostać lub zwiększyć do 400
+
+# Lepsze rozmieszczenie elementów:
+# - Spodek: y = 420
+# - Kubek: od y=200 do y=400
+# - Tekst wynikowy: y=450 i y=480
+# - Para: od y=150 w górę
+```
+
+#### Dodatkowe ulepszenia wizualne:
+- [ ] Gradient na kubku dla efektu 3D
+- [ ] Cień pod spodkiem
+- [ ] Lepsze renderowanie pary (bardziej realistyczne)
+- [ ] Animacja przy zmianie poziomu kawy
+- [ ] Obramowanie canvas dla lepszego wydzielenia
+
+### Panel środkowy (Wykresy)
+
+#### Problemy:
+- Wykresy mogą być zbyt małe
+- Zbyt mały odstęp między wykresami
+
+#### Propozycje:
+```python
+# Zwiększenie rozmiaru figury
+self.fig = Figure(figsize=(9, 11), dpi=90)  # było (8, 10)
+
+# Lepsze odstępy
+self.fig.tight_layout(pad=2.5)  # było pad=1.5
+```
+
+### Panel lewy (Parametry)
+
+#### Ulepszenia:
+- [ ] Szersze suwaki (length=250, było 200)
+- [ ] Większe fonty dla etykiet wartości
+- [ ] Tooltips z opisem każdego parametru
+- [ ] Ramki wokół grup parametrów
+
+### Panel dolny (Wynik)
+
+#### Ulepszenia:
+- [ ] Większy font dla wyniku (28pt zamiast 24pt)
+- [ ] Wyższy pasek postępu (50px zamiast 40px)
+- [ ] Animacja wypełniania paska
+- [ ] Gradient w pasku postępu
+- [ ] Ikona filiżanki obok wyniku
+
+### Kolorystyka
+
+#### Aktualna paleta:
+```
+Tło główne: #F0F0F0
+Panele: #E8E8E8, #FFFFFF
+Przyciski: #4CAF50 (zielony), #FF6347 (czerwony)
+```
+
+#### Propozycja nowej palety (ciepła, kawowa):
+```python
+COLORS = {
+    'background': '#F5F5DC',      # Beżowy (beige)
+    'panel_left': '#E8DCC4',      # Jasny brąz
+    'panel_middle': '#FFFFFF',    # Biały
+    'panel_right': '#FFF8E7',     # Kremowy
+    'panel_bottom': '#D2B48C',    # Tan
+    'button_primary': '#6F4E37',  # Brąz kawowy
+    'button_secondary': '#8B4513', # Sienna
+    'text_dark': '#2F1E15',       # Ciemny brąz
+    'accent': '#CD853F',          # Peru (akcent)
+}
+```
+
+### Rozmiar okna
+
+#### Aktualny: 1400x900
+#### Propozycja: 
+```python
+# Opcja 1: Zwiększyć wysokość
+self.root.geometry("1400x950")
+
+# Opcja 2: Zwiększyć oba wymiary
+self.root.geometry("1500x1000")
+
+# Opcja 3: Fullscreen z możliwością zmiany rozmiaru
+self.root.geometry("1400x900")
+self.root.state('zoomed')  # Maksymalizuj przy starcie
+self.root.resizable(True, True)  # Pozwól na zmianę rozmiaru
+```
+
+### Czcionki
+
+#### Propozycja ujednolicenia:
+```python
+FONTS = {
+    'title': ('Segoe UI', 16, 'bold'),
+    'heading': ('Segoe UI', 14, 'bold'),
+    'label': ('Segoe UI', 11),
+    'value': ('Segoe UI', 11, 'bold'),
+    'button': ('Segoe UI', 13, 'bold'),
+    'result_big': ('Segoe UI', 28, 'bold'),
+    'result_desc': ('Segoe UI', 20, 'bold'),
+}
+```
+
+## Konkretne zadania do wykonania
+
+### Zadanie 1: Naprawa kubka (NAJWAŻNIEJSZE)
+```python
+# W klasie CoffeeVisualizer.__init__():
+self.canvas_width = 400   # było 350
+self.canvas_height = 550  # było 400
+
+# W metodzie draw_cup():
+# Przesunąć wszystkie elementy w górę o 20-30px
+cup_bottom_y = 400   # było 320
+cup_top_y = 180      # było 150
+# ... dostosować resztę proporcjonalnie
+```
+
+### Zadanie 2: Responsive canvas
+```python
+# Umożliwić automatyczne dostosowanie do rozmiaru okna
+def _resize_canvas(self, event):
+    """Dostosowanie canvas przy zmianie rozmiaru okna"""
+    new_width = event.width
+    new_height = event.height
+    self.canvas.config(width=new_width, height=new_height)
+    self.redraw_cup()  # Przerysuj kubek
+```
+
+### Zadanie 3: Lepsze proporcje siatki
+```python
+# W _create_bottom_panel():
+parent.grid_rowconfigure(0, weight=4)  # Panel główny
+parent.grid_rowconfigure(1, weight=1)  # Panel dolny
+
+parent.grid_columnconfigure(0, weight=2)  # Panel lewy
+parent.grid_columnconfigure(1, weight=5)  # Panel środkowy
+parent.grid_columnconfigure(2, weight=3)  # Panel prawy
+```
+
+### Zadanie 4: Padding i odstępy
+```python
+# Zwiększyć padding we wszystkich panelach
+left_frame = tk.Frame(parent, bg="#E8E8E8", padx=25, pady=25)  # było 20, 20
+middle_frame = tk.Frame(parent, bg="#FFFFFF", padx=15, pady=15)  # było 10, 10
+right_frame = tk.Frame(parent, bg="#FFFFFF", padx=25, pady=25)  # było 20, 20
+```
+
+### Zadanie 5: Ulepszenia wizualne kubka
+```python
+# Dodać więcej szczegółów graficznych:
+# 1. Gradient na kubku
+# 2. Odbicie światła na powierzchni kawy
+# 3. Cień pod spodkiem
+# 4. Lepsza para (bardziej falista, półprzezroczysta)
+# 5. Delikatne obramowanie kubka dla kontrastu
+```
+
+## Dodatkowe funkcje (opcjonalne)
+
+### 1. Tooltips
+```python
+import tkinter.ttk as ttk
+
+def create_tooltip(widget, text):
+    """Dodaj tooltip do widgetu"""
+    tooltip = tk.Toplevel()
+    tooltip.withdraw()
+    tooltip.overrideredirect(True)
+    label = tk.Label(tooltip, text=text, background="#FFFFE0", 
+                     relief='solid', borderwidth=1, font=('Arial', 9))
+    label.pack()
+    
+    def show_tooltip(event):
+        tooltip.deiconify()
+        tooltip.geometry(f"+{event.x_root+10}+{event.y_root+10}")
+    
+    def hide_tooltip(event):
+        tooltip.withdraw()
+    
+    widget.bind('<Enter>', show_tooltip)
+    widget.bind('<Leave>', hide_tooltip)
+```
+
+### 2. Animacja paska postępu
+```python
+def _animate_progress_bar(self, target_value):
+    """Animacja wypełniania paska postępu"""
+    current = 0
+    step = target_value / 20  # 20 kroków animacji
+    
+    def animate():
+        nonlocal current
+        if current < target_value:
+            current += step
+            self._update_progress_bar(min(current, target_value))
+            self.root.after(30, animate)  # 30ms opóźnienia
+    
+    animate()
+```
+
+## Testowanie
+
+Po wprowadzeniu zmian przetestować:
+- [ ] Czy kubek jest w pełni widoczny przy różnych wartościach jakości?
+- [ ] Czy wszystkie elementy są widoczne przy rozdzielczości 1400x900?
+- [ ] Czy tekst pod kubkiem nie jest ucięty?
+- [ ] Czy aplikacja wygląda profesjonalnie?
+- [ ] Czy proporcje między panelami są odpowiednie?
+- [ ] Czy wykresy są czytelne?
+- [ ] Czy pasek postępu dobrze się wyświetla?
+
+## Priorytet zmian
+
+### Krytyczne (MUSI być naprawione):
+1. Zwiększenie wysokości canvas kubka (550px)
+2. Przesunięcie elementów kubka aby wszystko było widoczne
+3. Poprawa rozmieszczenia tekstu pod kubkiem
+
+### Ważne (Bardzo pożądane):
+4. Lepsza kolorystyka (cieplejsza paleta)
+5. Większe odstępy i padding
+6. Lepsze proporcje paneli w siatce
+7. Większe czcionki dla wyniku
+
+### Nice to have (Opcjonalne):
+8. Tooltips z opisami
+9. Animacje
+10. Ikony przy parametrach
+11. Gradient i efekty 3D na kubku
+
+## Struktura pliku wynikowego
+
+Po zmianach plik `gui.py` powinien zawierać:
+1. Słownik `COLORS` na początku
+2. Słownik `FONTS` na początku
+3. Zaktualizowaną klasę `CoffeeVisualizer` z większym canvas
+4. Zaktualizowaną klasę `CoffeeGUI` z lepszymi proporcjami
+5. Opcjonalne funkcje pomocnicze (tooltips, animacje)
+
+## Polecenie dla AI
+
+```
+Zmodyfikuj plik gui.py aplikacji BrewSense zgodnie z powyższymi wytycznymi.
+Priorytetem jest naprawa problemu z uciętym kubkiem kawy - zwiększ canvas 
+i dostosuj pozycje wszystkich elementów tak, aby cały kubek ze spodkiem 
+i tekstem był widoczny. Dodatkowo ulepsz ogólny wygląd aplikacji stosując 
+cieplejszą paletę kolorów i lepsze proporcje. Zachowaj wszystkie istniejące 
+funkcjonalności. Komentarze w kodzie po polsku, kod po angielsku.
+```
+
+---
+
+**Uwaga**: Ten prompt można skopiować i użyć do dalszej pracy nad projektem!

@@ -1,0 +1,239 @@
+# Prompt do projektu BrewSense
+
+Stwórz kompletny projekt systemu rozmytego do oceny jakości kawy o nazwie "BrewSense" w języku Python z graficznym interfejsem użytkownika. Projekt ma spełniać wymagania na ocenę 3.5-4.0 z przedmiotu "Systemy rozmyte".
+
+## WYMAGANIA TECHNICZNE
+
+### Biblioteki:
+- scikit-fuzzy (skfuzzy) - do implementacji logiki rozmytej
+- numpy - obliczenia numeryczne
+- matplotlib - wykresy funkcji przynależności
+- tkinter - interfejs graficzny
+
+### Struktura projektu:
+Utwórz 4 pliki:
+1. `fuzzy_system.py` - implementacja systemu rozmytego
+2. `gui.py` - interfejs graficzny z wizualizacją kubka
+3. `main.py` - punkt wejścia aplikacji
+4. `requirements.txt` - zależności projektu
+
+## SYSTEM ROZMYTY
+
+### Zmienne wejściowe (4):
+
+#### 1. Gorzkość (Bitterness) [0-10]:
+- Słaba (Low): trapez [0, 0, 2, 4]
+- Średnia (Medium): trójkąt [2, 5, 8]
+- Silna (High): trapez [6, 8, 10, 10]
+
+#### 2. Kwasowość (Acidity) [0-10]:
+- Niska (Low): trapez [0, 0, 2, 4]
+- Średnia (Medium): trójkąt [2, 5, 8]
+- Wysoka (High): trapez [6, 8, 10, 10]
+
+#### 3. Aromat (Aroma) [0-10]:
+- Słaby (Weak): trapez [0, 0, 2, 4]
+- Średni (Moderate): trójkąt [3, 5, 7]
+- Silny (Strong): trapez [6, 8, 10, 10]
+
+#### 4. Temperatura (Temperature) [60-95°C]:
+- Niska (Low): trapez [60, 60, 70, 75]
+- Optymalna (Optimal): trójkąt [72, 80, 88]
+- Wysoka (High): trapez [85, 90, 95, 95]
+
+### Zmienna wyjściowa:
+
+#### Jakość (Quality) [0-100]:
+- Bardzo słaba (Very Poor): trapez [0, 0, 15, 30]
+- Słaba (Poor): trójkąt [20, 35, 50]
+- Średnia (Average): trójkąt [40, 55, 70]
+- Dobra (Good): trójkąt [60, 75, 85]
+- Bardzo dobra (Very Good): trójkąt [75, 85, 95]
+- Wybitna (Excellent): trapez [85, 92, 100, 100]
+
+### Baza reguł (minimum 20-25 reguł):
+
+**Przykładowe reguły:**
+- JEŚLI Aromat=Silny I Gorzkość=Średnia I Kwasowość=Średnia I Temp=Optymalna TO Jakość=Wybitna
+- JEŚLI Aromat=Silny I Gorzkość=Słaba I Kwasowość=Wysoka I Temp=Optymalna TO Jakość=Wybitna
+- JEŚLI Aromat=Średni I Gorzkość=Średnia I Kwasowość=Średnia I Temp=Optymalna TO Jakość=Bardzo_dobra
+- JEŚLI Aromat=Słaby I Gorzkość=Silna I Kwasowość=Niska I Temp=Optymalna TO Jakość=Słaba
+- [... dodaj więcej reguł pokrywających różne kombinacje]
+
+**Zasady tworzenia reguł:**
+- Aromat jest najważniejszym parametrem (silny aromat → wyższa ocena)
+- Balans gorzkości i kwasowości jest kluczowy (średnie wartości = lepiej)
+- Optymalna temperatura podnosi ocenę
+- Ekstrema (bardzo silna gorzkość, brak aromatu) obniżają jakość
+
+**Metoda wnioskowania:** Mamdani  
+**Defuzzyfikacja:** środek ciężkości (centroid)
+
+## INTERFEJS GRAFICZNY
+
+### Układ okna (1400x900 pikseli):
+
+```
++-------------------+---------------------+--------------------+
+|   PANEL LEWNY     |   PANEL ŚRODKOWY   |   PANEL PRAWY      |
+|   (Parametry)     |   (Wykresy)        |   (Kubek)          |
+|                   |                    |                    |
+| Suwak: Gorzkość   | [Wykres funkcji    |   WIZUALIZACJA     |
+| [====●====] 5.0   |  przynależności    |     JAKOŚCI        |
+|                   |  dla wszystkich    |                    |
+| Suwak: Kwasowość  |  zmiennych         |    .-"""-.         |
+| [====●====] 5.0   |  wejściowych]      |   /       \        |
+|                   |                    |  |  KAWA   |       |
+| Suwak: Aromat     | [Wykres            |  |█████████|       |
+| [====●====] 5.0   |  defuzzyfikacji    |   \       /        |
+|                   |  wyjścia z         |    '.___.`         |
+| Suwak: Temperatura|  zaznaczonym       |    (_____)         |
+| [====●====] 80°C  |  wynikiem CoG]     |                    |
+|                   |                    |   95.0/100         |
+| [  Oceń kawę  ]   |                    |   "Wybitna!"       |
+| [    Reset    ]   |                    |                    |
++-------------------+---------------------+--------------------+
+|              PANEL DOLNY (Wynik)                             |
+|  Wynik: 95.0/100  [████████████████████░░] Wybitna kawa!    |
++--------------------------------------------------------------+
+```
+
+### Szczegóły wizualizacji kubka:
+
+#### 1. Kubek kawy (Canvas tkinter):
+- Rysuj trapezoidalny kubek z uchwytem
+- Wypełnienie kawą proporcjonalne do jakości (0-100%)
+- Kolor kawy zależny od jakości:
+  * 0-30: #C4A484 (jasnobrązowy - słaba)
+  * 31-50: #8B6F47 (średni brąz)
+  * 51-70: #6F4E37 (ciemny brąz)
+  * 71-85: #4A3728 (bardzo ciemny)
+  * 86-100: #2F1E15 (prawie czarny - wybitna)
+- Elipsa na górze kawy (efekt 3D)
+- Spodek pod kubkiem
+
+#### 2. Para nad kubkiem:
+- Jeśli temperatura > 75°C: rysuj 3 fale pary
+- Jeśli temperatura ≤ 75°C: brak pary
+
+#### 3. Tekst pod kubkiem:
+- Wartość numeryczna: "XX.X/100"
+- Opis słowny: "Bardzo słaba" / "Słaba" / "Średnia" / "Dobra" / "Bardzo dobra" / "Wybitna!"
+
+### Wykresy (matplotlib embedded w tkinter):
+
+#### 1. Panel środkowy - górny:
+- 4 subploty z funkcjami przynależności dla każdej zmiennej wejściowej
+- Czerwona linia pionowa zaznaczająca aktualną wartość
+- Legenda i opisy osi
+
+#### 2. Panel środkowy - dolny:
+- Wykres defuzzyfikacji (wszystkie funkcje wyjściowe + zagregowany wynik)
+- Czerwona linia pionowa w miejscu wyniku CoG
+- Wypełniony obszar zagregowanego wyjścia
+
+### Panel wynikowy (dolny):
+- Duży tekst z wynikiem numerycznym (font 24)
+- Kolorowy pasek postępu:
+  * 0-30: czerwony
+  * 31-50: pomarańczowy
+  * 51-70: żółty
+  * 71-85: jasnozielony
+  * 86-100: ciemnozielony
+- Opis tekstowy jakości
+
+## FUNKCJONALNOŚCI
+
+### 1. Przycisk "Oceń kawę":
+- Pobierz wartości z suwaków
+- Wywołaj system rozmyty
+- Zaktualizuj kubek (z płynną animacją wypełniania)
+- Zaktualizuj wykresy
+- Wyświetl wynik w panelu dolnym
+
+### 2. Przycisk "Reset":
+- Ustaw wszystkie suwaki na wartości domyślne
+- Wyczyść kubek (pusty)
+- Wyczyść wyniki
+
+### 3. Interaktywne suwaki:
+- Po zmianie wartości automatycznie pokazuj aktualną wartość obok suwaka
+- Dla temperatury: wyświetlaj "°C"
+
+## WYMAGANIA DOTYCZĄCE KODU
+
+### 1. Czytelność:
+- Wszystkie komentarze i docstringi PO POLSKU
+- Nazwy zmiennych po angielsku (zgodnie z konwencją Python)
+- Kod dobrze sformatowany (PEP 8)
+
+### 2. Modularność:
+- Oddzielna klasa `CoffeeQualitySystem` w `fuzzy_system.py`
+- Oddzielna klasa `CoffeeGUI` w `gui.py`
+- Klasa pomocnicza `CoffeeVisualizer` do rysowania kubka
+
+### 3. Obsługa błędów:
+- Try-except przy obliczeniach rozmytych
+- Walidacja zakresów wejściowych
+
+### 4. Wydajność:
+- Wykresy aktualizowane tylko po naciśnięciu "Oceń kawę"
+- Nie przeliczaj systemu przy każdym ruchu suwaka
+
+## PLIKI DO WYGENEROWANIA
+
+### 1. fuzzy_system.py
+```python
+# Pełna implementacja systemu rozmytego z:
+# - Definicjami zmiennych (antecedent/consequent)
+# - Funkcjami przynależności
+# - 25 regułami
+# - Metodą evaluate() zwracającą jakość
+# - Komentarzami po polsku
+```
+
+### 2. gui.py
+```python
+# Pełna implementacja GUI z:
+# - Klasą CoffeeGUI (główne okno)
+# - Klasą CoffeeVisualizer (rysowanie kubka)
+# - Wszystkimi widgetami (suwaki, przyciski, wykresy)
+# - Obsługą zdarzeń
+# - Komentarzami po polsku
+```
+
+### 3. main.py
+```python
+# Prosty punkt wejścia:
+if __name__ == "__main__":
+    from gui import CoffeeGUI
+    app = CoffeeGUI()
+    app.run()
+```
+
+### 4. requirements.txt
+```
+scikit-fuzzy==0.4.2
+numpy>=1.24.0
+matplotlib>=3.7.0
+```
+
+## DODATKOWE WYMAGANIA
+
+1. Kod musi być **gotowy do uruchomienia** - wystarczy `pip install -r requirements.txt` i `python main.py`
+2. Wszystkie komentarze w kodzie **po polsku**
+3. GUI musi być **estetyczne i czytelne** (odpowiednie odstępy, fonty, kolory)
+4. Kubek musi być **ładnie narysowany** (nie prostokąt, ale realistyczny kształt)
+5. Animacja wypełniania kubka powinna być **płynna** (stopniowe zwiększanie poziomu)
+6. System musi działać **poprawnie** - wyniki powinny mieć sens dla różnych kombinacji wejść
+
+## SCENARIUSZE TESTOWE DO WERYFIKACJI
+
+Po wygenerowaniu kodu, sprawdź czy działa dla:
+- Gorzkość=5, Kwasowość=5, Aromat=9, Temp=80 → ~90-95 (Wybitna)
+- Gorzkość=5, Kwasowość=4, Aromat=5, Temp=78 → ~55-65 (Średnia)
+- Gorzkość=8.5, Kwasowość=2, Aromat=3, Temp=68 → ~25-35 (Słaba)
+
+---
+
+**Wygeneruj kompletny, działający kod dla wszystkich 4 plików.**
