@@ -1,0 +1,73 @@
+Mam działającą aplikację BrewSense - system rozmyty do oceny jakości kawy napisany w Pythonie z GUI w tkinter. Wizualizacja kubka kawy wygląda zbyt prosto (jak z MS Paint). Chcę przepisać GUI na PyQt5, aby uzyskać:
+
+Lepszą grafikę (antyaliasing, gradient, cienie)
+Profesjonalny wygląd
+Lepsze możliwości stylowania (QSS)
+Płynniejsze animacje
+Cel zadania
+Przepisać TYLKO plik gui.py na PyQt5, zachowując:
+
+Całą funkcjonalność aplikacji
+Interfejs z fuzzy_system.py (bez zmian w tym pliku)
+Układ interfejsu (lewy/środkowy/prawy panel + dolny panel)
+Wszystkie funkcje (suwaki, przyciski, wykresy, wizualizacja kubka)
+Wymagania techniczneBiblioteki do użycia:
+pythonPyQt5>=5.15.0
+matplotlib>=3.7.0
+numpy>=1.24.0
+scikit-fuzzy>=0.4.2Struktura projektu (bez zmian):
+brewsense/src/
+├── main.py              # Bez zmian (tylko import z gui_pyqt)
+├── fuzzy_system.py      # BEZ ZMIAN
+├── gui_pyqt.py          # NOWY PLIK (przepisany gui.py)
+└── requirements_qt.txt  # Nowe wymagania
+
+Priorytet funkcjiKrytyczne (MUSI działać):
+
+- Wszystkie suwaki działają
+- Przycisk "Oceń Kawę" wywołuje fuzzy_system.evaluate()
+- Wykresy matplotlib się renderują
+- Kubek rysuje się poprawnie (QPainter)
+- Wynik wyświetla się w panelu dolnym
+Ważne (Bardzo pożądane):
+
+- Antyaliasing i gradienty na kubku
+- Animacja wypełniania kubka
+- Stylowanie QSS (przyciski, ramki, kolory)
+- Tooltips na wszystkich elementach
+- Para nad kubkiem (QPainterPath)
+Nice to have (Opcjonalne):
+
+- Animacja paska postępu (QPropertyAnimation)
+- Ikony przy przyciskach (QIcon)
+- Menu bar z opcjami (QMenuBar)
+- Eksport wyniku do PDF
+- Dark mode (alternatywny QSS)
+
+Checklist wizualny:
+ Kubek wygląda profesjonalnie (nie jak z Paint)
+ Wszystkie panele są widoczne przy 1920x1080
+ Wykresy są czytelne i dobrze osadzone
+ Przyciski reagują na hover/pressed
+ Animacje są płynne (60 FPS)
+ Kolory są spójne z paletą
+ Tooltips pojawiają się przy najechaniu
+
+ Pliki do wygenerowania
+
+gui_pyqt.py - Przepisany GUI z PyQt5
+main.py - Zaktualizowany punkt wejścia
+requirements_qt.txt - Nowe zależności
+fuzzy_system.py - BEZ ZMIAN (zostaje taki sam)
+
+Dodatkowe uwagi
+
+Używaj QPainterPath dla złożonych kształtów
+QLinearGradient / QRadialGradient dla efektów 3D
+QPropertyAnimation dla płynnych animacji
+QSS (Qt Style Sheets) dla globalnego stylowania
+Testuj na rozdzielczości 1920x1080
+Upewnij się, że cały kubek jest widoczny (nie ucięty)
+
+
+Oczekiwany rezultat: Profesjonalnie wyglądająca aplikacja z płynnym GUI, ładnym kubkiem kawy i wszystkimi funkcjami z wersji tkinter.

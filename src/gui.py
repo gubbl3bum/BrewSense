@@ -1,286 +1,360 @@
 """
-Interfejs graficzny dla systemu BrewSense
-Implementacja GUI z wizualizacją kubka kawy i wykresami
+Interfejs graficzny dla systemu BrewSense - wersja PyQt5
+Implementacja GUI z zaawansowaną wizualizacją kubka i wykresami
+
 """
 
-import tkinter as tk
-from tkinter import ttk
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                              QHBoxLayout, QLabel, QSlider, QPushButton, 
+                              QFrame, QGridLayout, QSplitter, QSizePolicy)
+from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QPointF, QRectF, pyqtProperty
+from PyQt5.QtGui import (QPainter, QColor, QPen, QBrush, QLinearGradient, 
+                         QRadialGradient, QPainterPath, QFont, QPalette, QIcon)
+import sys
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-# Zakładam, że plik fuzzy_system.py istnieje
+
 try:
     from fuzzy_system import CoffeeQualitySystem
 except ImportError:
     class CoffeeQualitySystem:
-        """Dummy class for testing if fuzzy_system is missing"""
+        """Dummy class for testing"""
         def evaluate(self, b, a, ar, t): return 75.0
-        def get_variables(self): return {'bitterness': object(), 'acidity': object(), 'aroma': object(), 'temperature': object(), 'quality': object()}
+        def get_variables(self): 
+            return {
+                'bitterness': type('obj', (object,), {'universe': np.arange(0, 10.1, 0.1), 'terms': {'low': type('obj', (object,), {'mf': np.zeros(101)})()}}),
+                'acidity': type('obj', (object,), {'universe': np.arange(0, 10.1, 0.1), 'terms': {'low': type('obj', (object,), {'mf': np.zeros(101)})()}}),
+                'aroma': type('obj', (object,), {'universe': np.arange(0, 10.1, 0.1), 'terms': {'weak': type('obj', (object,), {'mf': np.zeros(101)})()}}),
+                'temperature': type('obj', (object,), {'universe': np.arange(60, 95.1, 0.1), 'terms': {'low': type('obj', (object,), {'mf': np.zeros(351)})()}}),
+                'quality': type('obj', (object,), {'universe': np.arange(0, 100.1, 0.1), 'terms': {'very_poor': type('obj', (object,), {'mf': np.zeros(1001)})()}})
+            }
         def get_quality_label(self, q): return "Bardzo dobra"
 
 
-# Nowa paleta kolorów (ciepła, kawowa)
+# Paleta kolorów (ciepła, kawowa)
 COLORS = {
-    'background': '#F5F5DC',  # Beżowy (beige)
-    'panel_left': '#E8DCC4',  # Jasny brąz
-    'panel_middle': '#FFFFFF',  # Biały
-    'panel_right': '#FFF8E7',  # Kremowy
-    'panel_bottom': '#D2B48C',  # Tan
+    'background': '#F5F5DC',      # Beżowy
+    'panel_left': '#E8DCC4',      # Jasny brąz
+    'panel_middle': '#FFFFFF',    # Biały
+    'panel_right': '#FFF8E7',     # Kremowy
+    'panel_bottom': '#D2B48C',    # Tan
     'button_primary': '#6F4E37',  # Brąz kawowy
-    'button_secondary': '#8B4513', # Sienna
-    'text_dark': '#2F1E15',  # Ciemny brąz
-    'accent': '#CD853F',  # Peru (akcent)
+    'button_secondary': '#8B4513',# Sienna
+    'text_dark': '#2F1E15',       # Ciemny brąz
+    'accent': '#CD853F',          # Peru
 }
 
-# Propozycja ujednolicenia czcionek
-FONTS = {
-    'title': ('Segoe UI', 16, 'bold'),
-    'heading': ('Segoe UI', 14, 'bold'),
-    'label': ('Segoe UI', 11),
-    'value': ('Segoe UI', 12, 'bold'), # Zwiększone
-    'button': ('Segoe UI', 13, 'bold'),
-    'result_big': ('Segoe UI', 28, 'bold'),
-    'result_desc': ('Segoe UI', 20, 'bold'),
+# Style QSS dla profesjonalnego wyglądu
+QSS_STYLE = """
+QMainWindow {
+    background-color: #F5F5DC;
 }
 
-# Funkcja pomocnicza do tworzenia Tooltip (poza klasą)
-class Tooltip:
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tip_window = None
-        self.widget.bind('<Enter>', self.show_tooltip)
-        self.widget.bind('<Leave>', self.hide_tooltip)
+QFrame {
+    border-radius: 10px;
+}
 
-    def show_tooltip(self, event):
-        if self.tip_window or not self.text:
-            return
-        x, y, cx, cy = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 20
-        
-        self.tip_window = tk.Toplevel(self.widget)
-        self.tip_window.wm_overrideredirect(True)
-        self.tip_window.wm_geometry(f"+{x}+{y}")
-        
-        label = tk.Label(self.tip_window, text=self.text, justify=tk.LEFT,
-                         background="#FFFFE0", relief='solid', borderwidth=1,
-                         font=('Arial', 9))
-        label.pack(ipadx=1)
+QLabel {
+    color: #2F1E15;
+}
 
-    def hide_tooltip(self, event):
-        if self.tip_window:
-            self.tip_window.destroy()
-        self.tip_window = None
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #D2B48C, stop:0.5 #C4A484, stop:1 #BC9A6B);
+    color: #2F1E15;
+    border: 2px solid #8B6F47;
+    border-radius: 8px;
+    padding: 12px 30px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #E8DCC4, stop:0.5 #D2B48C, stop:1 #C4A484);
+    border: 2px solid #6F4E37;
+}
+
+QPushButton:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #BC9A6B, stop:0.5 #A67C52, stop:1 #8B6F47);
+    border: 2px solid #4A3728;
+}
+
+QPushButton#resetButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #C4A484, stop:0.5 #BC9A6B, stop:1 #A67C52);
+    border: 2px solid #6F4E37;
+}
+
+QPushButton#resetButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #D2B48C, stop:0.5 #C4A484, stop:1 #BC9A6B);
+    border: 2px solid #6F4E37;
+}
+
+QSlider::groove:horizontal {
+    border: 1px solid #999999;
+    height: 8px;
+    background: #CD853F;
+    margin: 2px 0;
+    border-radius: 4px;
+}
+
+QSlider::handle:horizontal {
+    background: #6F4E37;
+    border: 2px solid #2F1E15;
+    width: 20px;
+    margin: -6px 0;
+    border-radius: 10px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #8B4513;
+}
+
+QToolTip {
+    background-color: #FFFFE0;
+    color: black;
+    border: 1px solid #2F1E15;
+    padding: 5px;
+    border-radius: 3px;
+}
+"""
 
 
-class CoffeeVisualizer:
-    """Klasa odpowiedzialna za rysowanie wizualizacji kubka kawy"""
+class CoffeeVisualizer(QWidget):
+    """Widget wizualizacji kubka kawy z zaawansowaną grafiką"""
     
-    def __init__(self, canvas):
-        """
-        Inicjalizacja wizualizera
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(400, 550)
+        self.quality_value = 0
+        self.temperature_value = 60
+        self.fill_level = 0  # Dla animacji
         
-        Args:
-            canvas: Widget Canvas z tkinter
-        """
-        self.canvas = canvas
-        # Zwiększenie rozmiaru canvas (Zadanie 1)
-        self.canvas_width = 400
-        self.canvas_height = 550
-        self.canvas.config(width=self.canvas_width, height=self.canvas_height)
+        # Animacja wypełniania
+        self.animation = QPropertyAnimation(self, b"fillLevel")
+        self.animation.setDuration(800)
+        self.animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(0.0)
     
-    def _hex_to_rgb(self, hex_color):
-        """Konwertuje kolor HEX na krotkę RGB"""
-        h = hex_color.lstrip('#')
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    @pyqtProperty(float)
+    def fillLevel(self):
+        return self.fill_level
+    
+    @fillLevel.setter
+    def fillLevel(self, value):
+        self.fill_level = value
+        self.update()
+    
+    def set_coffee(self, quality, temperature):
+        """Ustawienie parametrów kawy z animacją"""
+        self.quality_value = quality
+        self.temperature_value = temperature
         
-    def draw_cup(self, quality_value, temperature_val):
-        """
-        Rysowanie kubka z kawą - NAPRAWIONY PROBLEM Z UCIĘCIEM
+        # Animacja wypełniania
+        target_fill = quality / 100.0
+        self.animation.stop()
+        self.animation.setStartValue(float(self.fill_level))
+        self.animation.setEndValue(float(target_fill))
+        self.animation.start()
+    
+    def clear(self):
+        """Natychmiastowe wyczyszczenie kubka bez animacji"""
+        self.animation.stop()
+        self.quality_value = 0
+        self.temperature_value = 60
+        self.fill_level = 0
+        self.update()
+    
+    def paintEvent(self, event):
+        """Rysowanie kubka z użyciem QPainter"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
         
-        Args:
-            quality_value (float): Jakość kawy (0-100)
-            temperature_val (float): Temperatura kawy (60-95°C)
-        """
-        # Czyszczenie canvas
-        self.canvas.delete("all")
+        # Tło
+        painter.fillRect(self.rect(), QColor(COLORS['panel_right']))
         
-        # Parametry kubka (dostosowane do canvas_height = 550)
-        center_x = self.canvas_width // 2
-        
-        # Pozycje zgodne z wymaganiami
-        cup_bottom_y = 400  # Było 320
-        cup_top_y = 180     # Było 150
-        spodek_y = 420      # Nowa pozycja spodka
-        
+        # Parametry kubka
+        center_x = self.width() // 2
+        cup_bottom_y = 400
+        cup_top_y = 180
         cup_height = cup_bottom_y - cup_top_y
-        cup_bottom_width = 140 # Zwiększone
-        cup_top_width = 160    # Zwiększone
+        cup_bottom_width = 140
+        cup_top_width = 160
+        spodek_y = 420
         
-        # Obliczenie pozycji kubka
+        # Pozycje kubka
         left_bottom = center_x - cup_bottom_width // 2
         right_bottom = center_x + cup_bottom_width // 2
         left_top = center_x - cup_top_width // 2
         right_top = center_x + cup_top_width // 2
         
         # Rysowanie cienia pod spodkiem
-        self.canvas.create_oval(
-            center_x - 90, spodek_y + 8,
-            center_x + 95, spodek_y + 25,
-            fill="#000000", outline="", stipple="gray25"
-        )
+        shadow_gradient = QRadialGradient(center_x, spodek_y + 16, 95)
+        shadow_gradient.setColorAt(0, QColor(0, 0, 0, 60))
+        shadow_gradient.setColorAt(1, QColor(0, 0, 0, 0))
+        painter.setBrush(QBrush(shadow_gradient))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(center_x, spodek_y + 16), 95, 12)
         
         # Rysowanie spodka
-        self.canvas.create_oval(
-            center_x - 95, spodek_y,
-            center_x + 95, spodek_y + 20,
-            fill=COLORS['accent'], outline=COLORS['text_dark'], width=2
-        )
+        painter.setPen(QPen(QColor(COLORS['text_dark']), 2))
+        saucer_gradient = QLinearGradient(0, spodek_y, 0, spodek_y + 20)
+        saucer_gradient.setColorAt(0, QColor(COLORS['accent']).lighter(110))
+        saucer_gradient.setColorAt(1, QColor(COLORS['accent']).darker(110))
+        painter.setBrush(QBrush(saucer_gradient))
+        painter.drawEllipse(QPointF(center_x, spodek_y + 10), 95, 10)
         
-        # Rysowanie korpusu kubka (trapez)
-        cup_points = [
-            left_top, cup_top_y,
-            right_top, cup_top_y,
-            right_bottom, cup_bottom_y,
-            left_bottom, cup_bottom_y
-        ]
-        self.canvas.create_polygon(
-            cup_points,
-            fill=COLORS['panel_right'], outline=COLORS['text_dark'], width=3
-        )
-
-        # Gradient/Odbicie światła 3D na kubku
-        self.canvas.create_line(
-            left_top + 5, cup_top_y + 5,
-            left_bottom + 5, cup_bottom_y - 5,
-            fill="#FFFFFF", width=3, stipple="gray50" 
-        )
+        # Rysowanie korpusu kubka z gradientem
+        cup_path = QPainterPath()
+        cup_path.moveTo(left_top, cup_top_y)
+        cup_path.lineTo(right_top, cup_top_y)
+        cup_path.lineTo(right_bottom, cup_bottom_y)
+        cup_path.lineTo(left_bottom, cup_bottom_y)
+        cup_path.closeSubpath()
+        
+        cup_gradient = QLinearGradient(left_top, cup_top_y, right_top, cup_top_y)
+        cup_gradient.setColorAt(0, QColor(COLORS['panel_right']).darker(105))
+        cup_gradient.setColorAt(0.5, QColor(COLORS['panel_right']).lighter(105))
+        cup_gradient.setColorAt(1, QColor(COLORS['panel_right']).darker(105))
+        
+        painter.setPen(QPen(QColor(COLORS['text_dark']), 3))
+        painter.setBrush(QBrush(cup_gradient))
+        painter.drawPath(cup_path)
+        
+        # Odbicie światła na kubku
+        highlight_gradient = QLinearGradient(left_top + 10, cup_top_y, left_top + 30, cup_top_y)
+        highlight_gradient.setColorAt(0, QColor(255, 255, 255, 80))
+        highlight_gradient.setColorAt(1, QColor(255, 255, 255, 0))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(highlight_gradient))
+        highlight_rect = QRectF(left_top + 5, cup_top_y + 10, 25, cup_height - 20)
+        painter.drawRect(highlight_rect)
         
         # Rysowanie uchwytu
+        handle_path = QPainterPath()
         handle_x = right_top + 10
         handle_y_top = cup_top_y + 30
-        handle_y_bottom = cup_top_y + 120 # Trochę niższy uchwyt
+        handle_y_bottom = cup_top_y + 120
         
-        self.canvas.create_arc(
-            handle_x, handle_y_top,
-            handle_x + 40, handle_y_bottom,
-            start=270, extent=180, style=tk.ARC,
-            outline=COLORS['text_dark'], width=3
+        handle_path.moveTo(handle_x, handle_y_top)
+        handle_path.cubicTo(
+            handle_x + 50, handle_y_top,
+            handle_x + 50, handle_y_bottom,
+            handle_x, handle_y_bottom
         )
         
-        # Określenie koloru kawy na podstawie jakości
-        coffee_color = self._get_coffee_color(quality_value)
+        painter.setPen(QPen(QColor(COLORS['text_dark']), 3))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(handle_path)
         
-        # Obliczenie poziomu wypełnienia (proporcjonalnie do jakości)
-        fill_percentage = quality_value / 100.0
-        coffee_level = cup_bottom_y - (cup_height * fill_percentage * 0.85)
-        
-        # Rysowanie kawy (wypełnienie)
-        if fill_percentage > 0:
-            # Obliczenie szerokości na poziomie kawy (interpolacja liniowa)
+        # Rysowanie kawy z animacją
+        if self.fill_level > 0:
+            coffee_color = self._get_coffee_color(self.quality_value)
+            coffee_level = cup_bottom_y - (cup_height * self.fill_level * 0.85)
+            
+            # Obliczenie szerokości na poziomie kawy
             coffee_width_ratio = (coffee_level - cup_top_y) / cup_height
             coffee_left = left_top + (left_bottom - left_top) * coffee_width_ratio
             coffee_right = right_top + (right_bottom - right_top) * coffee_width_ratio
             
-            coffee_points = [
-                coffee_left, coffee_level,
-                coffee_right, coffee_level,
-                right_bottom, cup_bottom_y,
-                left_bottom, cup_bottom_y
-            ]
+            # Ścieżka wypełnienia kawą z gradientem
+            coffee_path = QPainterPath()
+            coffee_path.moveTo(coffee_left, coffee_level)
+            coffee_path.lineTo(coffee_right, coffee_level)
+            coffee_path.lineTo(right_bottom, cup_bottom_y)
+            coffee_path.lineTo(left_bottom, cup_bottom_y)
+            coffee_path.closeSubpath()
             
-            self.canvas.create_polygon(
-                coffee_points,
-                fill=coffee_color, outline=""
-            )
+            coffee_gradient = QLinearGradient(coffee_left, coffee_level, coffee_right, coffee_level)
+            coffee_gradient.setColorAt(0, QColor(coffee_color).darker(110))
+            coffee_gradient.setColorAt(0.5, QColor(coffee_color))
+            coffee_gradient.setColorAt(1, QColor(coffee_color).darker(110))
             
-            # Rysowanie elipsy na powierzchni kawy (efekt 3D)
-            self.canvas.create_oval(
-                coffee_left, coffee_level - 5,
-                coffee_right, coffee_level + 5,
-                fill=self._darken_color(coffee_color), outline=""
-            )
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(coffee_gradient))
+            painter.drawPath(coffee_path)
             
-            # Lśniący punkt na kawie (Odbicie światła)
-            self.canvas.create_oval(
-                center_x - 20, coffee_level - 8,
-                center_x, coffee_level - 5,
-                fill="#FFFFFF", outline="", tags="highlight"
-            )
+            # Elipsa na powierzchni kawy (3D)
+            surface_gradient = QRadialGradient(center_x, coffee_level, (coffee_right - coffee_left) / 2)
+            surface_gradient.setColorAt(0, QColor(coffee_color).lighter(110))
+            surface_gradient.setColorAt(1, QColor(coffee_color).darker(120))
+            
+            painter.setBrush(QBrush(surface_gradient))
+            painter.drawEllipse(QPointF(center_x, coffee_level), 
+                              (coffee_right - coffee_left) / 2, 8)
+            
+            # Lśniący punkt (odbicie światła)
+            highlight = QRadialGradient(center_x - 20, coffee_level - 5, 15)
+            highlight.setColorAt(0, QColor(255, 255, 255, 180))
+            highlight.setColorAt(1, QColor(255, 255, 255, 0))
+            painter.setBrush(QBrush(highlight))
+            painter.drawEllipse(QPointF(center_x - 20, coffee_level - 5), 15, 8)
         
         # Rysowanie pary (jeśli temperatura > 75°C)
-        if temperature_val > 75:
-            self._draw_steam(center_x, cup_top_y - 10)
+        if self.temperature_value > 75:
+            self._draw_steam(painter, center_x, cup_top_y - 10)
         
-        # Rysowanie wyniku pod kubkiem (nowe pozycje, aby nie były ucięte)
-        quality_label = self._get_quality_label(quality_value)
+        # Tekst pod kubkiem
+        painter.setPen(QPen(QColor(COLORS['text_dark']), 1))
         
         # Wartość numeryczna
-        self.canvas.create_text(
-            center_x, 460, # Nowa pozycja y
-            text=f"{quality_value:.1f}/100",
-            font=FONTS['result_desc'],
-            fill=COLORS['text_dark']
-        )
+        font = QFont("Segoe UI", 20, QFont.Bold)
+        painter.setFont(font)
+        painter.drawText(QRectF(0, 460, self.width(), 30), 
+                        Qt.AlignCenter, 
+                        f"{self.quality_value:.1f}/100")
         
         # Etykieta słowna
-        label_color = self._get_label_color(quality_value)
-        self.canvas.create_text(
-            center_x, 490, # Nowa pozycja y
-            text=quality_label,
-            font=FONTS['heading'],
-            fill=label_color
-        )
+        quality_label = self._get_quality_label(self.quality_value)
+        label_color = self._get_label_color(self.quality_value)
+        painter.setPen(QPen(QColor(label_color), 1))
+        font.setPointSize(14)
+        painter.setFont(font)
+        painter.drawText(QRectF(0, 490, self.width(), 30), 
+                        Qt.AlignCenter, 
+                        quality_label)
     
-    def _draw_steam(self, center_x, start_y):
-        """Rysowanie pary nad kubkiem (ulepszone, bardziej faliste)"""
-        steam_color = "#D3D3D3"
+    def _draw_steam(self, painter, center_x, start_y):
+        """Rysowanie pary nad kubkiem"""
+        painter.setPen(QPen(QColor(211, 211, 211, 150), 3, Qt.SolidLine, Qt.RoundCap))
         
-        # Trzy fale pary
         for i in range(3):
             x_offset = -20 + i * 20
             y_start = start_y - i * 5
             
-            # Fala jako krzywa
-            points = []
-            for t in np.linspace(0, 1, 30):
+            steam_path = QPainterPath()
+            steam_path.moveTo(center_x + x_offset, y_start)
+            
+            for t in np.linspace(0, 1, 20):
                 x = center_x + x_offset + np.sin(t * 3.14 * 3 + i) * 10
                 y = y_start - t * 40
-                points.extend([x, y])
+                steam_path.lineTo(x, y)
             
-            self.canvas.create_line(
-                points,
-                smooth=True, width=3, fill=steam_color, stipple="gray50" # Półprzezroczysta
-            )
+            painter.drawPath(steam_path)
     
     def _get_coffee_color(self, quality_value):
         """Określenie koloru kawy na podstawie jakości"""
         if quality_value < 30:
-            return "#C4A484"  # Jasnobrązowy
+            return "#C4A484"
         elif quality_value < 50:
-            return "#8B6F47"  # Średni brąz
+            return "#8B6F47"
         elif quality_value < 70:
-            return "#6F4E37"  # Ciemny brąz
+            return "#6F4E37"
         elif quality_value < 85:
-            return "#4A3728"  # Bardzo ciemny
+            return "#4A3728"
         else:
-            return COLORS['text_dark'] # Prawie czarny
-    
-    def _darken_color(self, color):
-        """Przyciemnienie koloru (dla efektu 3D)"""
-        # Używamy helpera _hex_to_rgb
-        try:
-            rgb = self._hex_to_rgb(color)
-        except ValueError:
-            rgb = (100, 100, 100) # Fallback
-            
-        darker_rgb = tuple(min(255, int(c * 0.7)) for c in rgb)
-        return f"#{darker_rgb[0]:02x}{darker_rgb[1]:02x}{darker_rgb[2]:02x}"
+            return COLORS['text_dark']
     
     def _get_quality_label(self, quality_value):
-        """Określenie etykiety jakości (przeniesione z CoffeeGUI)"""
+        """Określenie etykiety jakości"""
         if quality_value < 30:
             return "Bardzo słaba"
         elif quality_value < 50:
@@ -295,7 +369,7 @@ class CoffeeVisualizer:
             return "Wybitna!"
     
     def _get_label_color(self, quality_value):
-        """Określenie koloru etykiety na podstawie jakości"""
+        """Określenie koloru etykiety"""
         if quality_value < 30:
             return "#C41E3A"
         elif quality_value < 50:
@@ -306,456 +380,438 @@ class CoffeeVisualizer:
             return "#90EE90"
         else:
             return "#228B22"
+
+
+class MplCanvas(FigureCanvasQTAgg):
+    """Canvas matplotlib dla PyQt5"""
     
-    def clear_cup(self):
-        """Wyczyszczenie kubka (pusty kubek)"""
-        self.canvas.delete("all")
-        self.draw_cup(0, 60)
+    def __init__(self, parent=None, width=9, height=11, dpi=90):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        super().__init__(self.fig)
+        self.setParent(parent)
+        
+        # Subploty
+        self.axes = [self.fig.add_subplot(5, 1, i+1) for i in range(5)]
+        self.fig.tight_layout(pad=2.5)
 
 
-class CoffeeGUI:
-    """Główna klasa interfejsu graficznego aplikacji BrewSense"""
+class ProgressBarWidget(QWidget):
+    """Widget paska postępu z animacją"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(50)
+        self.progress_value = 0
+        
+        # Animacja
+        self.animation = QPropertyAnimation(self, b"progressValue")
+        self.animation.setDuration(800)
+        self.animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(0.0)
+    
+    @pyqtProperty(float)
+    def progressValue(self):
+        return self.progress_value
+    
+    @progressValue.setter
+    def progressValue(self, value):
+        self.progress_value = value
+        self.update()
+    
+    def set_progress(self, value):
+        """Ustawienie wartości postępu z animacją"""
+        self.animation.stop()
+        self.animation.setStartValue(float(self.progress_value))
+        self.animation.setEndValue(float(value))
+        self.animation.start()
+    
+    def reset(self):
+        """Natychmiastowy reset bez animacji"""
+        self.animation.stop()
+        self.progress_value = 0
+        self.update()
+    
+    def paintEvent(self, event):
+        """Rysowanie paska postępu"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Tło
+        painter.fillRect(self.rect(), QColor("#CCCCCC"))
+        painter.setPen(QPen(QColor(COLORS['text_dark']), 2))
+        painter.drawRect(self.rect())
+        
+        # Wypełnienie z gradientem
+        fill_width = int((self.progress_value / 100.0) * self.width())
+        
+        if fill_width > 0:
+            gradient = QLinearGradient(0, 0, fill_width, 0)
+            color = self._get_color(self.progress_value)
+            gradient.setColorAt(0, QColor(color).darker(110))
+            gradient.setColorAt(0.5, QColor(color))
+            gradient.setColorAt(1, QColor(color).lighter(110))
+            
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(gradient))
+            painter.drawRect(0, 0, fill_width, self.height())
+        
+        # Ikona filiżanki
+        if fill_width > 0:
+            painter.setPen(QPen(Qt.black))
+            font = QFont("Arial", 24)
+            painter.setFont(font)
+            painter.drawText(QRectF(fill_width + 10, 0, 40, self.height()),
+                           Qt.AlignVCenter | Qt.AlignLeft, "☕")
+    
+    def _get_color(self, value):
+        """Określenie koloru na podstawie wartości - odcienie brązu"""
+        if value < 20:
+            return "#D2B48C"  # Tan - bardzo jasny brąz
+        elif value < 40:
+            return "#BC9A6B"  # Jaśniejszy brąz
+        elif value < 60:
+            return "#A67C52"  # Średni brąz
+        elif value < 75:
+            return "#8B6F47"  # Ciemniejszy brąz
+        elif value < 85:
+            return "#6F4E37"  # Brąz kawowy
+        else:
+            return "#4A3728"  # Bardzo ciemny brąz - najlepsza kawa
+
+
+class CoffeeGUI(QMainWindow):
+    """Główna klasa GUI aplikacji BrewSense"""
     
     def __init__(self):
-        """Inicjalizacja GUI"""
-        self.root = tk.Tk()
-        self.root.title("BrewSense - System Oceny Jakości Kawy")
-        # Rozmiar 1920x1080 (Full HD)
-        self.root.geometry("1920x1080")
-        self.root.resizable(True, True) 
+        super().__init__()
+        self.setWindowTitle("BrewSense - System Oceny Jakości Kawy")
+        self.setGeometry(0, 0, 1920, 1080)
         
         # Inicjalizacja systemu rozmytego
         self.fuzzy_system = CoffeeQualitySystem()
-        
-        # Wartości domyślne
         self.current_quality = 0
+        
+        # Stylowanie
+        self.setStyleSheet(QSS_STYLE)
         
         # Tworzenie interfejsu
         self._create_widgets()
-        
-    def _create_widgets(self):
-        """Tworzenie wszystkich widgetów GUI"""
-        
-        # Główny frame z nowym tłem
-        main_frame = tk.Frame(self.root, bg=COLORS['background'])
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Konfiguracja siatki (Lepsze proporcje)
-        main_frame.grid_rowconfigure(0, weight=9) 
-        main_frame.grid_rowconfigure(1, weight=1)  
-
-        main_frame.grid_columnconfigure(0, weight=2)  # Panel lewy (parametry)
-        main_frame.grid_columnconfigure(1, weight=6)  # Panel środkowy (wykresy)
-        main_frame.grid_columnconfigure(2, weight=3)  # Panel prawy (kubek)
-        
-        # Panel lewy (parametry)
-        self._create_left_panel(main_frame)
-        
-        # Panel środkowy (wykresy)
-        self._create_middle_panel(main_frame)
-        
-        # Panel prawy (kubek)
-        self._create_right_panel(main_frame)
-        
-        # Panel dolny (wynik)
-        self._create_bottom_panel(main_frame)
     
-    def _create_left_panel(self, parent):
+    def _create_widgets(self):
+        """Tworzenie wszystkich widgetów"""
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        # Główny layout
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+        
+        # Górna część (3 panele)
+        top_splitter = QSplitter(Qt.Horizontal)
+        
+        # Panel lewy
+        left_panel = self._create_left_panel()
+        top_splitter.addWidget(left_panel)
+        
+        # Panel środkowy
+        middle_panel = self._create_middle_panel()
+        top_splitter.addWidget(middle_panel)
+        
+        # Panel prawy
+        right_panel = self._create_right_panel()
+        top_splitter.addWidget(right_panel)
+        
+        # Proporcje paneli (2:6:3)
+        top_splitter.setStretchFactor(0, 2)
+        top_splitter.setStretchFactor(1, 6)
+        top_splitter.setStretchFactor(2, 3)
+        
+        main_layout.addWidget(top_splitter, stretch=9)
+        
+        # Panel dolny
+        bottom_panel = self._create_bottom_panel()
+        main_layout.addWidget(bottom_panel, stretch=1)
+    
+    def _create_left_panel(self):
         """Tworzenie lewego panelu z suwakami"""
-        # Ramka lewego panelu z efektem 3D dla estetyki
-        left_frame = tk.Frame(
-            parent, bg=COLORS['panel_left'], padx=25, pady=25,
-            bd=3, relief=tk.RIDGE, # Dodanie obramowania
-            highlightbackground=COLORS['text_dark'], highlightcolor=COLORS['text_dark'], highlightthickness=1
-        )
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        panel = QFrame()
+        panel.setStyleSheet(f"background-color: {COLORS['panel_left']}; border-radius: 10px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
         
         # Tytuł
-        title = tk.Label(
-            left_frame, text="Parametry Kawy",
-            font=FONTS['title'], bg=COLORS['panel_left'], fg=COLORS['text_dark']
-        )
-        title.pack(pady=(0, 20))
+        title = QLabel("Parametry Kawy")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        layout.addSpacing(20)
         
         # Suwaki
-        self.bitterness_var = tk.DoubleVar(value=5.0)
-        self.acidity_var = tk.DoubleVar(value=5.0)
-        self.aroma_var = tk.DoubleVar(value=5.0)
-        self.temperature_var = tk.DoubleVar(value=80.0)
-        
-        # Gorzkość
-        self._create_slider(
-            left_frame, "Gorzkość (Bitterness):",
-            self.bitterness_var, 0, 10, "", "Intensywność goryczy (0=brak, 10=bardzo gorzka)"
+        self.bitterness_slider, self.bitterness_label = self._create_slider(
+            layout, "Gorzkość (Bitterness):", 0, 100, 50,
+            "Intensywność goryczy (0=brak, 10=bardzo gorzka)"
         )
         
-        # Kwasowość
-        self._create_slider(
-            left_frame, "Kwasowość (Acidity):",
-            self.acidity_var, 0, 10, "", "Poziom kwasowości (0=płaska, 10=bardzo kwaśna)"
+        self.acidity_slider, self.acidity_label = self._create_slider(
+            layout, "Kwasowość (Acidity):", 0, 100, 50,
+            "Poziom kwasowości (0=płaska, 10=bardzo kwaśna)"
         )
         
-        # Aromat
-        self._create_slider(
-            left_frame, "Aromat (Aroma):",
-            self.aroma_var, 0, 10, "", "Bogactwo i intensywność zapachu kawy"
+        self.aroma_slider, self.aroma_label = self._create_slider(
+            layout, "Aromat (Aroma):", 0, 100, 50,
+            "Bogactwo i intensywność zapachu kawy"
         )
         
-        # Temperatura
-        self._create_slider(
-            left_frame, "Temperatura (Temperature):",
-            self.temperature_var, 60, 95, "°C", "Temperatura podania (60-95°C)"
+        self.temperature_slider, self.temperature_label = self._create_slider(
+            layout, "Temperatura (Temperature):", 600, 950, 800,
+            "Temperatura podania (60-95°C)", is_temperature=True
         )
+        
+        layout.addSpacing(30)
         
         # Przyciski
-        button_frame = tk.Frame(left_frame, bg=COLORS['panel_left'])
-        button_frame.pack(pady=30)
+        evaluate_btn = QPushButton("Oceń Kawę")
+        evaluate_btn.clicked.connect(self.evaluate_coffee)
+        evaluate_btn.setCursor(Qt.PointingHandCursor)  # Kursor wskazujący
+        layout.addWidget(evaluate_btn)
         
-        # Przycisk "Oceń Kawę"
-        evaluate_btn = tk.Button(
-            button_frame, text="Oceń Kawę",
-            font=FONTS['button'],
-            bg=COLORS['button_primary'], fg="white",
-            padx=30, pady=10,
-            command=self.evaluate_coffee,
-            bd=2, relief=tk.RAISED
-        )
-        evaluate_btn.pack(pady=5)
+        reset_btn = QPushButton("Reset")
+        reset_btn.setObjectName("resetButton")
+        reset_btn.clicked.connect(self.reset_values)
+        reset_btn.setCursor(Qt.PointingHandCursor)  # Kursor wskazujący
+        layout.addWidget(reset_btn)
         
-        # Przycisk "Reset"
-        reset_btn = tk.Button(
-            button_frame, text="Reset",
-            font=("Segoe UI", 12),
-            bg=COLORS['button_secondary'], fg="white",
-            padx=30, pady=8,
-            command=self.reset_values,
-            bd=2, relief=tk.RAISED
-        )
-        reset_btn.pack(pady=5)
+        layout.addStretch()
+        
+        return panel
     
-    def _create_slider(self, parent, label_text, variable, from_, to, unit, tooltip_text=""):
-        """
-        Tworzenie suwaka z etykietą, ulepszone o obramowanie
-        """
-        # Ramka dla każdego suwaka z lekkim obramowaniem (GROOVE)
-        frame = tk.Frame(
-            parent, bg=COLORS['panel_left'],
-            bd=1, relief=tk.GROOVE, # Subtelne obramowanie
-            padx=5, pady=5
-        )
-        frame.pack(fill=tk.X, pady=10)
+    def _create_slider(self, layout, label_text, min_val, max_val, default_val, tooltip, is_temperature=False):
+        """Tworzenie suwaka z etykietą"""
+        # Ramka dla suwaka
+        frame = QFrame()
+        frame.setStyleSheet("background-color: transparent; border: 1px solid #999; border-radius: 5px; padding: 10px;")
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(10, 10, 10, 10)
         
         # Etykieta
-        label = tk.Label(
-            frame, text=label_text,
-            font=FONTS['label'], bg=COLORS['panel_left'], fg=COLORS['text_dark']
-        )
-        label.pack(anchor="w")
+        label = QLabel(label_text)
+        label.setFont(QFont("Segoe UI", 11))
+        frame_layout.addWidget(label)
         
-        # Frame dla suwaka i wartości
-        slider_frame = tk.Frame(frame, bg=COLORS['panel_left'])
-        slider_frame.pack(fill=tk.X, pady=5)
+        # Kontener dla suwaka i wartości
+        slider_container = QHBoxLayout()
         
-        # Suwak (długość 250, z jednolitym stylem obramowania)
-        slider = tk.Scale(
-            slider_frame, from_=from_, to=to,
-            orient=tk.HORIZONTAL, variable=variable,
-            resolution=0.1, length=250, 
-            bg=COLORS['panel_left'], troughcolor=COLORS['accent'],
-            # Dodatkowe ustawienia dla "obramowania" i wyglądu
-            highlightthickness=1, 
-            highlightbackground=COLORS['text_dark'],
-            highlightcolor=COLORS['text_dark'],
-            bd=0 
-        )
-        slider.pack(side=tk.LEFT)
+        # Suwak
+        slider = QSlider(Qt.Horizontal)
+        slider.setMinimum(min_val)
+        slider.setMaximum(max_val)
+        slider.setValue(default_val)
+        slider.setToolTip(tooltip)
+        slider_container.addWidget(slider)
         
-        # Tooltip
-        if tooltip_text:
-            Tooltip(slider, tooltip_text)
-
-        # Etykieta z wartością (większy font)
-        value_label = tk.Label(
-            slider_frame, text=f"{variable.get():.1f}{unit}",
-            font=FONTS['value'], bg=COLORS['panel_left'], fg=COLORS['text_dark'], width=8
-        )
-        value_label.pack(side=tk.LEFT, padx=10)
+        # Etykieta wartości
+        if is_temperature:
+            value_label = QLabel(f"{default_val/10:.1f}°C")
+        else:
+            value_label = QLabel(f"{default_val/10:.1f}")
+        value_label.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        value_label.setMinimumWidth(80)
+        value_label.setAlignment(Qt.AlignCenter)
+        slider_container.addWidget(value_label)
         
-        # Aktualizacja wartości przy zmianie
-        def update_value(*args):
-            value_label.config(text=f"{variable.get():.1f}{unit}")
+        frame_layout.addLayout(slider_container)
         
-        variable.trace('w', update_value)
+        # Aktualizacja wartości
+        def update_value(val):
+            if is_temperature:
+                value_label.setText(f"{val/10:.1f}°C")
+            else:
+                value_label.setText(f"{val/10:.1f}")
+        
+        slider.valueChanged.connect(update_value)
+        
+        layout.addWidget(frame)
+        
+        return slider, value_label
     
-    def _create_middle_panel(self, parent):
+    def _create_middle_panel(self):
         """Tworzenie środkowego panelu z wykresami"""
-        # Ramka środkowego panelu z efektem 3D
-        middle_frame = tk.Frame(
-            parent, bg=COLORS['panel_middle'], padx=15, pady=15,
-            bd=3, relief=tk.RIDGE
-        )
-        middle_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        panel = QFrame()
+        panel.setStyleSheet(f"background-color: {COLORS['panel_middle']}; border-radius: 10px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
         
         # Tytuł
-        title = tk.Label(
-            middle_frame, text="Wykresy Funkcji Przynależności",
-            font=FONTS['heading'], bg=COLORS['panel_middle'], fg=COLORS['text_dark']
-        )
-        title.pack(pady=(0, 10))
+        title = QLabel("Wykresy Funkcji Przynależności")
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
         
-        # Figure dla wykresów 
-        self.fig = Figure(figsize=(9, 11), dpi=90) 
-        self.canvas_plot = FigureCanvasTkAgg(self.fig, master=middle_frame)
-        self.canvas_plot.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        # Canvas matplotlib
+        self.plot_canvas = MplCanvas(panel, width=9, height=11, dpi=90)
+        layout.addWidget(self.plot_canvas)
         
-        # Początkowe puste wykresy
         self._initialize_plots()
+        
+        return panel
     
-    def _create_right_panel(self, parent):
+    def _create_right_panel(self):
         """Tworzenie prawego panelu z wizualizacją kubka"""
-        # Ramka prawego panelu z efektem 3D
-        right_frame = tk.Frame(
-            parent, bg=COLORS['panel_right'], padx=25, pady=25,
-            bd=3, relief=tk.RIDGE
-        )
-        right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
+        panel = QFrame()
+        panel.setStyleSheet(f"background-color: {COLORS['panel_right']}; border-radius: 10px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(25, 25, 25, 25)
         
         # Tytuł
-        title = tk.Label(
-            right_frame, text="Wizualizacja Jakości",
-            font=FONTS['heading'], bg=COLORS['panel_right'], fg=COLORS['text_dark']
-        )
-        title.pack(pady=(0, 20))
+        title = QLabel("Wizualizacja Jakości")
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
         
-        # Canvas dla kubka 
-        self.cup_canvas = tk.Canvas(
-            right_frame, width=400, height=550, 
-            bg=COLORS['panel_right'], highlightthickness=0
-        )
-        self.cup_canvas.pack(fill=tk.BOTH, expand=True) 
+        layout.addSpacing(20)
         
-        # Inicjalizacja wizualizera
-        self.visualizer = CoffeeVisualizer(self.cup_canvas)
-        self.visualizer.draw_cup(0, 60)
+        # Wizualizacja kubka
+        self.visualizer = CoffeeVisualizer()
+        layout.addWidget(self.visualizer)
+        
+        layout.addStretch()
+        
+        return panel
     
-    def _create_bottom_panel(self, parent):
+    def _create_bottom_panel(self):
         """Tworzenie dolnego panelu z wynikiem"""
-        # Ramka dolnego panelu z efektem 3D
-        bottom_frame = tk.Frame(
-            parent, bg=COLORS['panel_bottom'], padx=25, pady=20,
-            bd=3, relief=tk.GROOVE
-        )
-        bottom_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
+        panel = QFrame()
+        panel.setStyleSheet(f"background-color: {COLORS['panel_bottom']}; border-radius: 10px;")
+        panel.setMaximumHeight(120)
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(25, 20, 25, 20)
         
-        # Etykieta wyniku (większy font)
-        self.result_label = tk.Label(
-            bottom_frame, text="Wynik: 0.0/100",
-            font=FONTS['result_big'], bg=COLORS['panel_bottom'], fg=COLORS['text_dark']
-        )
-        self.result_label.pack(side=tk.LEFT, padx=20)
+        # Wynik
+        self.result_label = QLabel("Wynik: 0.0/100")
+        self.result_label.setFont(QFont("Segoe UI", 28, QFont.Bold))
+        layout.addWidget(self.result_label)
         
         # Pasek postępu
-        self.progress_frame = tk.Frame(bottom_frame, bg=COLORS['panel_bottom'])
-        self.progress_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=20)
+        self.progress_bar = ProgressBarWidget()
+        layout.addWidget(self.progress_bar, stretch=1)
         
-        self.progress_canvas = tk.Canvas(
-            self.progress_frame, height=50, bg=COLORS['panel_bottom'],
-            highlightthickness=0
-        )
-        self.progress_canvas.pack(fill=tk.X)
+        # Opis
+        self.description_label = QLabel("")
+        self.description_label.setFont(QFont("Segoe UI", 20, QFont.Bold))
+        self.description_label.setMinimumWidth(200)
+        self.description_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.description_label)
         
-        # Etykieta opisu
-        self.description_label = tk.Label(
-            bottom_frame, text="",
-            font=FONTS['result_desc'], bg=COLORS['panel_bottom'], fg=COLORS['text_dark']
-        )
-        self.description_label.pack(side=tk.LEFT, padx=20)
-        
-        # Początkowy pasek postępu
-        self._update_progress_bar(0)
+        return panel
     
     def _initialize_plots(self):
         """Inicjalizacja pustych wykresów"""
-        self.fig.clear()
+        for ax in self.plot_canvas.axes:
+            ax.clear()
+            ax.grid(True, alpha=0.3)
         
-        # 5 subplotów (4 dla wejść, 1 dla wyjścia)
-        self.ax1 = self.fig.add_subplot(5, 1, 1)
-        self.ax2 = self.fig.add_subplot(5, 1, 2)
-        self.ax3 = self.fig.add_subplot(5, 1, 3)
-        self.ax4 = self.fig.add_subplot(5, 1, 4)
-        self.ax5 = self.fig.add_subplot(5, 1, 5)
-        
-        # Lepsze odstępy (pad=2.5)
-        self.fig.tight_layout(pad=2.5)
-        self.canvas_plot.draw()
+        self.plot_canvas.fig.tight_layout(pad=2.5)
+        self.plot_canvas.draw()
     
     def _update_plots(self):
-        """Aktualizacja wykresów po obliczeniu"""
-        self.fig.clear()
-        
+        """Aktualizacja wykresów"""
         variables = self.fuzzy_system.get_variables()
         
-        # Lista osi
-        axes = [self.fig.add_subplot(5, 1, i+1) for i in range(5)]
         input_vars = ['bitterness', 'acidity', 'aroma', 'temperature']
-        titles = ['Gorzkość (Bitterness)', 'Kwasowość (Acidity)', 'Aromat (Aroma)', 'Temperatura (Temperature)', 'Jakość (Quality) - Defuzzyfikacja']
+        titles = ['Gorzkość (Bitterness)', 'Kwasowość (Acidity)', 
+                 'Aromat (Aroma)', 'Temperatura (Temperature)', 
+                 'Jakość (Quality) - Defuzzyfikacja']
         units = ['Wartość', 'Wartość', 'Wartość', '°C', 'Wartość (0-100)']
-        input_values = [self.bitterness_var.get(), self.acidity_var.get(), self.aroma_var.get(), self.temperature_var.get()]
+        input_values = [
+            self.bitterness_slider.value() / 10,
+            self.acidity_slider.value() / 10,
+            self.aroma_slider.value() / 10,
+            self.temperature_slider.value() / 10
+        ]
         
-        for i, ax in enumerate(axes):
+        for i, ax in enumerate(self.plot_canvas.axes):
+            ax.clear()
+            
             var_name = input_vars[i] if i < 4 else 'quality'
             var = variables[var_name]
             
             for label in var.terms:
-                ax.plot(
-                    var.universe,
-                    var[label].mf,
-                    label=label, linewidth=1.5
-                )
+                ax.plot(var.universe, var[label].mf, label=label, linewidth=1.5)
             
             if i < 4:
-                ax.axvline(input_values[i], color=COLORS['text_dark'], linestyle='--', linewidth=2)
+                ax.axvline(input_values[i], color=COLORS['text_dark'], 
+                          linestyle='--', linewidth=2)
             else:
-                ax.axvline(self.current_quality, color=COLORS['button_primary'], linestyle='--', linewidth=2, label='Wynik')
-                
+                ax.axvline(self.current_quality, color=COLORS['button_primary'], 
+                          linestyle='--', linewidth=2, label='Wynik')
+            
             ax.set_title(titles[i], fontsize=10)
             ax.set_xlabel(units[i], fontsize=8)
             ax.set_ylabel('Przynależność', fontsize=8)
             ax.legend(fontsize=7, loc='upper right')
             ax.grid(True, alpha=0.3)
         
-        self.fig.tight_layout(pad=2.5) # Lepsze odstępy
-        self.canvas_plot.draw()
-    
-    def _get_progress_bar_color(self, quality_value):
-        """Określenie koloru paska na podstawie jakości"""
-        if quality_value < 30:
-            return "#C41E3A"  # Czerwony
-        elif quality_value < 50:
-            return "#FF6347"  # Pomarańczowy
-        elif quality_value < 70:
-            return "#FFD700"  # Żółty
-        elif quality_value < 85:
-            return "#90EE90"  # Jasnozielony
-        else:
-            return COLORS['button_primary'] # Kawowy brąz/zielony
-            
-    def _update_progress_bar(self, quality_value):
-        """
-        Aktualizacja paska postępu (zwiększona wysokość, gradient)
-        """
-        self.progress_canvas.delete("all")
-        
-        width = self.progress_canvas.winfo_width()
-        if width <= 1:
-            width = 600  # Domyślna szerokość
-        
-        height = 50 # Zwiększona wysokość
-        
-        # Tło paska
-        self.progress_canvas.create_rectangle(
-            0, 0, width, height,
-            fill="#CCCCCC", outline=COLORS['text_dark'], width=2
-        )
-        
-        # Wypełnienie proporcjonalne do jakości
-        fill_width = (quality_value / 100.0) * width
-        
-        # Kolor wiodący dla gradientu
-        start_color = self._get_progress_bar_color(quality_value)
-        
-        # Prosty gradient
-        try:
-            r, g, b = self.visualizer._hex_to_rgb(start_color)
-            for i in range(int(fill_width)):
-                # Zmiana jasności wzdłuż paska
-                ratio = i / width
-                r_step = int(r * (0.8 + 0.2 * ratio))
-                g_step = int(g * (0.8 + 0.2 * ratio))
-                b_step = int(b * (0.8 + 0.2 * ratio))
-                gradient_color = f"#{r_step:02x}{g_step:02x}{b_step:02x}"
-                self.progress_canvas.create_line(i, 0, i, height, fill=gradient_color, width=1)
-        except ValueError:
-             # Fallback na jednolity kolor
-            self.progress_canvas.create_rectangle(
-                0, 0, fill_width, height,
-                fill=start_color, outline=""
-            )
-            
-        # Rysowanie ikony filiżanki obok paska (opcjonalne)
-        self.progress_canvas.create_text(
-             fill_width + 20, height // 2,
-             text="☕", font=('Arial', 24), anchor="w"
-        )
-        
-    def _animate_progress_bar(self, target_value):
-        """Animacja wypełniania paska postępu"""
-        current = 0
-        step = target_value / 20 # 20 kroków animacji
-        
-        def animate():
-            nonlocal current
-            if current < target_value:
-                current += step
-                # Ograniczenie do wartości docelowej
-                progress = min(current, target_value)
-                self._update_progress_bar(progress)
-                self.root.after(30, animate)  # 30ms opóźnienia
-            else:
-                # Ostateczne ustawienie wartości na 100% dokładności
-                self._update_progress_bar(target_value)
-        
-        animate()
+        self.plot_canvas.fig.tight_layout(pad=2.5)
+        self.plot_canvas.draw()
     
     def evaluate_coffee(self):
-        """Ocena kawy - główna funkcja wywoływana przyciskiem"""
-        # Pobranie wartości z suwaków
-        bitterness = self.bitterness_var.get()
-        acidity = self.acidity_var.get()
-        aroma = self.aroma_var.get()
-        temperature = self.temperature_var.get()
+        """Ocena kawy"""
+        # Pobranie wartości
+        bitterness = self.bitterness_slider.value() / 10
+        acidity = self.acidity_slider.value() / 10
+        aroma = self.aroma_slider.value() / 10
+        temperature = self.temperature_slider.value() / 10
         
         # Obliczenie jakości
         quality = self.fuzzy_system.evaluate(bitterness, acidity, aroma, temperature)
         self.current_quality = quality
         
-        # Aktualizacja wizualizacji kubka
-        self.visualizer.draw_cup(quality, temperature)
+        # Aktualizacja wizualizacji
+        self.visualizer.set_coffee(quality, temperature)
         
         # Aktualizacja wykresów
         self._update_plots()
         
-        # Aktualizacja panelu wyniku (większy font)
-        self.result_label.config(text=f"Wynik: {quality:.1f}/100")
-        
-        # Animacja paska postępu
-        self._animate_progress_bar(quality)
+        # Aktualizacja wyniku
+        self.result_label.setText(f"Wynik: {quality:.1f}/100")
+        self.progress_bar.set_progress(quality)
         
         # Aktualizacja opisu
-        quality_label = self.visualizer._get_quality_label(quality) # Używamy metody z Visualizer
+        quality_label = self.visualizer._get_quality_label(quality)
         label_color = self.visualizer._get_label_color(quality)
-        self.description_label.config(text=quality_label, fg=label_color)
+        self.description_label.setText(quality_label)
+        self.description_label.setStyleSheet(f"color: {label_color};")
     
     def reset_values(self):
-        """Reset wszystkich wartości do domyślnych"""
-        self.bitterness_var.set(5.0)
-        self.acidity_var.set(5.0)
-        self.aroma_var.set(5.0)
-        self.temperature_var.set(80.0)
+        """Reset wartości"""
+        self.bitterness_slider.setValue(50)
+        self.acidity_slider.setValue(50)
+        self.aroma_slider.setValue(50)
+        self.temperature_slider.setValue(800)
         
         self.current_quality = 0
         
-        # Wyczyszczenie kubka
-        self.visualizer.draw_cup(0, 60)
+        # Użycie nowych metod bez animacji dla resetu
+        self.visualizer.clear()
+        self.progress_bar.reset()
         
-        # Reset wykresów
         self._initialize_plots()
         
-        # Reset panelu wyniku
-        self.result_label.config(text="Wynik: 0.0/100")
-        self._update_progress_bar(0)
-        self.description_label.config(text="", fg=COLORS['text_dark'])
-    
-    def run(self):
-        """Uruchomienie aplikacji"""
-        self.root.mainloop()
+        self.result_label.setText("Wynik: 0.0/100")
+        self.description_label.setText("")
+
+
+def main():
+    """Funkcja główna"""
+    app = QApplication(sys.argv)
+    window = CoffeeGUI()
+    window.show()
+    sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()

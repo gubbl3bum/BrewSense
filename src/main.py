@@ -1,15 +1,9 @@
 """
 BrewSense - System Oceny Jakości Kawy
-Punkt wejścia aplikacji
+Punkt wejścia aplikacji (wersja PyQt5)
 """
 
-from gui import CoffeeGUI
-
-
-def main():
-    """Funkcja główna uruchamiająca aplikację"""
-    app = CoffeeGUI()
-    app.run()
+from gui import main
 
 
 if __name__ == "__main__":
