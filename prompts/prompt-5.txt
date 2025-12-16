@@ -1,0 +1,21 @@
+Problem: elementy GUI nie skalują się poprawnie — przy mniejszych rozdzielczościach wychodzą poza ekran, a przy większych pozostają nieproporcjonalne.
+
+Twoje zadanie:
+
+Przeanalizuj kod pod kątem problemów ze skalowalnością i responsywnością layoutu.
+
+Popraw rozmieszczenie elementów tak, aby interfejs poprawnie dopasowywał się do różnych rozdzielczości i proporcji ekranu.
+
+Zastąp układy oparte na stałych pozycjach i rozmiarach (np. place, sztywne width/height) rozwiązaniami skalowalnymi (np. grid, pack, wagi kolumn/wierszy, expand, fill).
+
+Zapewnij, że żaden element nie wychodzi poza obszar okna przy minimalnym sensownym rozmiarze.
+
+Zachowaj istniejącą funkcjonalność i logikę aplikacji — zmiany mają dotyczyć wyłącznie warstwy GUI.
+
+Jeżeli to konieczne, dodaj obsługę zmiany rozmiaru okna (resizable, odpowiednie konfiguracje layoutu).
+
+W odpowiedzi:
+
+pokaż poprawioną wersję gui.py,
+
+krótko wyjaśnij, jakie zmiany zostały wprowadzone i dlaczego poprawiają skalowalność.
