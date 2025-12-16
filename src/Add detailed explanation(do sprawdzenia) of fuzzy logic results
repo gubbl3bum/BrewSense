@@ -1,0 +1,541 @@
+"""
+System rozmyty do oceny jakości kawy - BrewSense
+Implementacja logiki rozmytej z wykorzystaniem scikit-fuzzy
+Wersja z rozszerzonymi logami debugowania
+
+Czym jest logika rozmyta?
+To sposób na podejmowanie decyzji "po ludzku" - zamiast "tak/nie" mamy "trochę tak, trochę nie".
+Np. kawa o temperaturze 78°C jest "trochę optymalna" i "trochę niska" jednocześnie.
+System bierze to pod uwagę i daje elastyczną ocenę.
+"""
+
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+
+
+class CoffeeQualitySystem:
+    """
+    Główna klasa, która ocenia kawę na podstawie 4 parametrów:
+    - gorzkość (0-10)
+    - kwasowość (0-10) 
+    - aromat (0-10)
+    - temperatura (60-95°C)
+    
+    I daje wynik: jakość kawy (0-100 punktów)
+    """
+    
+    def __init__(self):
+        """
+        Konstruktor - odpala się gdy tworzysz nowy system.
+        Ustawia wszystko co potrzebne: zmienne, funkcje przynależności, reguły.
+        """
+        self._create_variables()
+        self._create_membership_functions()
+        self._create_rules()
+        self._create_control_system()
+    
+    def _create_variables(self):
+        """
+        Tworzymy zmienne - to co wchodzi do systemu i co z niego wychodzi.
+        
+        Antecedent = zmienna wejściowa (to co mierzymy)
+        Consequent = zmienna wyjściowa (to co chcemy obliczyć)
+        """
+        
+        # Zmienne wejściowe - to co podajemy systemowi
+        # np.arange(0, 10.1, 0.1) = zakres od 0 do 10 co 0.1
+        self.bitterness = ctrl.Antecedent(np.arange(0, 10.1, 0.1), 'bitterness')  # gorzkość
+        self.acidity = ctrl.Antecedent(np.arange(0, 10.1, 0.1), 'acidity')        # kwasowość
+        self.aroma = ctrl.Antecedent(np.arange(0, 10.1, 0.1), 'aroma')            # aromat
+        self.temperature = ctrl.Antecedent(np.arange(60, 95.1, 0.1), 'temperature') # temperatura w °C
+        
+        # Zmienna wyjściowa - to co system oblicza (jakość kawy 0-100)
+        # defuzzify_method='centroid' = sposób na zamianę "rozmytej" odpowiedzi na konkretną liczbę
+        self.quality = ctrl.Consequent(np.arange(0, 100.1, 0.1), 'quality', defuzzify_method='centroid')
+        self.quality.defuzzify_method = 'centroid'
+        
+        # Ustawienie wartości domyślnej - jak system nie wie co zrobić, zwróci 25 (słaba kawa)
+        # To zabezpieczenie na wypadek gdyby żadna reguła się nie uruchomiła
+        try:
+            self.quality.default_value = 25.0  # wartość "awaryjjna"
+        except AttributeError:
+            # Stara wersja biblioteki - nie ma tej funkcji, trudno
+            pass
+    
+    def _create_membership_functions(self):
+        """
+        Tworzymy funkcje przynależności - to "serce" logiki rozmytej.
+        
+        Mówimy systemowi jak interpretować wartości:
+        - Gorzkość 3 to "trochę niska, trochę średnia"
+        - Temperatura 78°C to "dość optymalna"
+        itp.
+        
+        trapmf = trapez (plateau na górze)
+        trimf = trójkąt (szpic na górze)
+        """
+        
+        # === GORZKOŚĆ (0-10) ===
+        # [0, 0, 2, 4] = trapez: od 0 do 0 rośnie, od 0 do 2 na górze, od 2 do 4 spada
+        self.bitterness['low'] = fuzz.trapmf(self.bitterness.universe, [0, 0, 2, 4])      # niska (0-4)
+        self.bitterness['medium'] = fuzz.trimf(self.bitterness.universe, [2, 5, 8])       # średnia (2-8)
+        self.bitterness['high'] = fuzz.trapmf(self.bitterness.universe, [6, 8, 10, 10])   # wysoka (6-10)
+        
+        # === KWASOWOŚĆ (0-10) ===
+        # Analogicznie jak gorzkość
+        self.acidity['low'] = fuzz.trapmf(self.acidity.universe, [0, 0, 2, 4])
+        self.acidity['medium'] = fuzz.trimf(self.acidity.universe, [2, 5, 8])
+        self.acidity['high'] = fuzz.trapmf(self.acidity.universe, [6, 8, 10, 10])
+        
+        # === AROMAT (0-10) ===
+        # weak = słaby, moderate = umiarkowany, strong = silny
+        self.aroma['weak'] = fuzz.trapmf(self.aroma.universe, [0, 0, 2, 4])
+        self.aroma['moderate'] = fuzz.trimf(self.aroma.universe, [3, 5, 7])
+        self.aroma['strong'] = fuzz.trapmf(self.aroma.universe, [6, 8, 10, 10])
+        
+        # === TEMPERATURA (60-95°C) ===
+        # low = zimna, optimal = idealna, high = za gorąca
+        self.temperature['low'] = fuzz.trapmf(self.temperature.universe, [60, 60, 70, 75])
+        self.temperature['optimal'] = fuzz.trimf(self.temperature.universe, [72, 80, 88])
+        self.temperature['high'] = fuzz.trapmf(self.temperature.universe, [85, 90, 95, 95])
+        
+        # === JAKOŚĆ WYJŚCIOWA (0-100) ===
+        # 6 kategorii od "very_poor" (beznadziejna) do "excellent" (wybitna)
+        self.quality['very_poor'] = fuzz.trapmf(self.quality.universe, [0, 0, 15, 30])    # 0-30
+        self.quality['poor'] = fuzz.trimf(self.quality.universe, [20, 35, 50])            # 20-50
+        self.quality['average'] = fuzz.trimf(self.quality.universe, [40, 55, 70])         # 40-70
+        self.quality['good'] = fuzz.trimf(self.quality.universe, [60, 75, 85])            # 60-85
+        self.quality['very_good'] = fuzz.trimf(self.quality.universe, [75, 85, 95])       # 75-95
+        self.quality['excellent'] = fuzz.trapmf(self.quality.universe, [85, 92, 100, 100]) # 85-100
+    
+    def _create_rules(self):
+        """
+        Tworzymy reguły - logika biznesowa systemu.
+        
+        Reguła to po prostu: JEŚLI [warunki] TO [wynik]
+        Np: JEŚLI aromat silny I gorzkość średnia I kwasowość średnia I temp optymalna
+            TO jakość wybitna
+        
+        & = operator AND (i)
+        | = operator OR (lub) - nieużywany tu, ale możliwy
+        """
+        
+        self.rules = [
+            # ==========================================
+            # REGUŁY DLA WYBITNEJ KAWY (excellent)
+            # ==========================================
+            # Potrzeba: silny aromat + balans + optymalna temperatura
+            
+            # Idealny balans wszystkiego
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['excellent']),
+            
+            # Silny aromat + mało goryczki + więcej kwasowości (np. kawa owocowa)
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['low'] & 
+                     self.acidity['high'] & self.temperature['optimal'], 
+                     self.quality['excellent']),
+            
+            # Silny aromat + więcej goryczki + mniej kwasowości (np. kawa ciemniejsza)
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['high'] & 
+                     self.acidity['low'] & self.temperature['optimal'], 
+                     self.quality['excellent']),
+            
+            # ==========================================
+            # REGUŁY DLA BARDZO DOBREJ KAWY (very_good)
+            # ==========================================
+            
+            # Umiarkowany aromat ale idealny balans reszty
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['very_good']),
+            
+            # Silny aromat + balans, ale temperatura trochę za wysoka
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['high'], 
+                     self.quality['very_good']),
+            
+            # Silny aromat + lekka goryczka + średnia kwasowość
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['low'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['very_good']),
+            
+            # Silny aromat + średnia goryczka + lekka kwasowość
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['medium'] & 
+                     self.acidity['low'] & self.temperature['optimal'], 
+                     self.quality['very_good']),
+            
+            # ==========================================
+            # REGUŁY DLA DOBREJ KAWY (good)
+            # ==========================================
+            
+            # Umiarkowany aromat + średnia goryczka + lekka kwasowość
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['medium'] & 
+                     self.acidity['low'] & self.temperature['optimal'], 
+                     self.quality['good']),
+            
+            # Umiarkowany aromat + lekka goryczka + średnia kwasowość
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['low'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['good']),
+            
+            # Silny aromat + balans, ale temperatura za niska (zimna kawa)
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['low'], 
+                     self.quality['good']),
+            
+            # Umiarkowany aromat + balans, ale temperatura za wysoka
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['high'], 
+                     self.quality['good']),
+            
+            # Silny aromat, ale za dużo goryczki i kwasowości jednocześnie
+            ctrl.Rule(self.aroma['strong'] & self.bitterness['high'] & 
+                     self.acidity['high'] & self.temperature['optimal'], 
+                     self.quality['good']),
+            
+            # ==========================================
+            # REGUŁY DLA ŚREDNIEJ KAWY (average)
+            # ==========================================
+            
+            # Umiarkowany aromat, ale wszystko stonowane
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['low'] & 
+                     self.acidity['low'] & self.temperature['optimal'], 
+                     self.quality['average']),
+            
+            # Słaby aromat, reszta w miarę OK
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['average']),
+            
+            # Umiarkowany aromat + za dużo goryczki
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['high'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['average']),
+            
+            # Umiarkowany aromat + za dużo kwasowości + za gorąca
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['medium'] & 
+                     self.acidity['high'] & self.temperature['high'], 
+                     self.quality['average']),
+            
+            # Umiarkowany aromat + balans, ale za zimna
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['low'], 
+                     self.quality['average']),
+            
+            # ==========================================
+            # REGUŁY DLA SŁABEJ KAWY (poor)
+            # ==========================================
+            
+            # Słaby aromat + za dużo goryczki
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['high'] & 
+                     self.acidity['low'] & self.temperature['optimal'], 
+                     self.quality['poor']),
+            
+            # Słaby aromat + za dużo kwasowości
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['low'] & 
+                     self.acidity['high'] & self.temperature['optimal'], 
+                     self.quality['poor']),
+            
+            # Umiarkowany aromat + za dużo wszystkiego + zimna
+            ctrl.Rule(self.aroma['moderate'] & self.bitterness['high'] & 
+                     self.acidity['high'] & self.temperature['low'], 
+                     self.quality['poor']),
+            
+            # Słaby aromat + zimna
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['medium'] & 
+                     self.acidity['medium'] & self.temperature['low'], 
+                     self.quality['poor']),
+            
+            # Słaby aromat + za gorąca + mało smaku
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['low'] & 
+                     self.acidity['low'] & self.temperature['high'], 
+                     self.quality['poor']),
+            
+            # ==========================================
+            # REGUŁY DLA BARDZO SŁABEJ KAWY (very_poor)
+            # ==========================================
+            
+            # Słaby aromat + za dużo goryczki i kwasowości - masakra
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['high'] & 
+                     self.acidity['high'] & self.temperature['optimal'], 
+                     self.quality['very_poor']),
+            
+            # Słaby aromat + mało smaku + zimna - beznadziejna
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['low'] & 
+                     self.acidity['low'] & self.temperature['low'], 
+                     self.quality['very_poor']),
+            
+            # Słaby aromat + za dużo goryczki + za gorąca
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['high'] & 
+                     self.acidity['low'] & self.temperature['high'], 
+                     self.quality['very_poor']),
+            
+            # Słaby aromat + za dużo wszystkiego + zimna
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['high'] & 
+                     self.acidity['high'] & self.temperature['low'], 
+                     self.quality['very_poor']),
+            
+            # Słaby aromat + za dużo wszystkiego + za gorąca
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['high'] & 
+                     self.acidity['high'] & self.temperature['high'], 
+                     self.quality['very_poor']),
+            
+            # ==========================================
+            # REGUŁY DOMYŚLNE (FALLBACK)
+            # ==========================================
+            # To zabezpieczenia - łapią przypadki, których nie przewidzieliśmy wyżej
+            
+            # Brak aromatu = zawsze kiepska kawa, bez względu na resztę
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['low'] & 
+                     self.acidity['low'] & self.temperature['optimal'], 
+                     self.quality['very_poor']),
+            
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['medium'] & 
+                     self.acidity['low'] & self.temperature['optimal'], 
+                     self.quality['very_poor']),
+            
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['low'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['poor']),
+            
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['medium'] & 
+                     self.acidity['high'] & self.temperature['optimal'], 
+                     self.quality['poor']),
+            
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['high'] & 
+                     self.acidity['medium'] & self.temperature['optimal'], 
+                     self.quality['poor']),
+            
+            # Dodatkowe zabezpieczenia dla skrajnych temperatur
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['low'] & 
+                     self.acidity['medium'] & self.temperature['high'], 
+                     self.quality['poor']),
+            
+            ctrl.Rule(self.aroma['weak'] & self.bitterness['medium'] & 
+                     self.acidity['low'] & self.temperature['low'], 
+                     self.quality['very_poor']),
+            
+            # ==========================================
+            # REGUŁY UNIWERSALNE (CATCH-ALL)
+            # ==========================================
+            # Najprostsze reguły - łapią wszystko co zostało
+            # Używamy mniej warunków, więc mają szerszy zasięg
+            
+            # Słaby aromat + zimna = beznadziejna
+            ctrl.Rule(self.aroma['weak'] & self.temperature['low'], 
+                     self.quality['very_poor']),
+            
+            # Słaby aromat + za gorąca = słaba
+            ctrl.Rule(self.aroma['weak'] & self.temperature['high'], 
+                     self.quality['poor']),
+            
+            # Słaby aromat + optymalna temp = słaba (catch-all dla weak aroma)
+            ctrl.Rule(self.aroma['weak'] & self.temperature['optimal'], 
+                     self.quality['poor']),
+            
+            # Średni aromat + zimna = słaba
+            ctrl.Rule(self.aroma['moderate'] & self.temperature['low'], 
+                     self.quality['poor']),
+            
+            # Średni aromat + za gorąca = średnia
+            ctrl.Rule(self.aroma['moderate'] & self.temperature['high'], 
+                     self.quality['average']),
+            
+            # Silny aromat + zimna = średnia (marnowanie potencjału)
+            ctrl.Rule(self.aroma['strong'] & self.temperature['low'], 
+                     self.quality['average']),
+            
+            # Silny aromat + za gorąca = dobra (wciąż lepsza niż średnia)
+            ctrl.Rule(self.aroma['strong'] & self.temperature['high'], 
+                     self.quality['good']),
+        ]
+    
+    def _create_control_system(self):
+        """
+        Łączymy wszystkie reguły w jeden system i tworzymy symulator.
+        Symulator to "silnik", który potem będzie przetwarzał konkretne wartości.
+        """
+        self.control_system = ctrl.ControlSystem(self.rules)
+        self.simulator = ctrl.ControlSystemSimulation(self.control_system)
+    
+    def evaluate(self, bitterness_val, acidity_val, aroma_val, temperature_val):
+        """
+        GŁÓWNA FUNKCJA - ocenia jakość kawy.
+        
+        Podajesz 4 wartości:
+        - bitterness_val: gorzkość 0-10
+        - acidity_val: kwasowość 0-10
+        - aroma_val: aromat 0-10
+        - temperature_val: temperatura 60-95°C
+        
+        Dostajesz z powrotem:
+        - liczbę 0-100 (jakość kawy)
+        
+        Funkcja też dużo wypisuje na ekran - logi pokazujące co się dzieje w środku.
+        """
+        print("\n" + "="*70)
+        print("ROZPOCZĘCIE OCENY KAWY - FUZZY SYSTEM LOG")
+        print("="*70)
+        
+        try:
+            # === KROK 1: Pokazujemy co dostaliśmy na wejściu ===
+            print("\n[1] WARTOŚCI WEJŚCIOWE:")
+            print(f"    Gorzkość (Bitterness):  {bitterness_val:.2f}")
+            print(f"    Kwasowość (Acidity):    {acidity_val:.2f}")
+            print(f"    Aromat (Aroma):         {aroma_val:.2f}")
+            print(f"    Temperatura:            {temperature_val:.2f}°C")
+            
+            # === KROK 2: Sprawdzamy czy wartości są OK ===
+            print("\n[2] WALIDACJA ZAKRESÓW:")
+            valid = True
+            
+            # Sprawdzamy gorzkość
+            if not (0 <= bitterness_val <= 10):
+                print(f"    ⚠️  UWAGA: Gorzkość poza zakresem [0-10]: {bitterness_val}")
+                bitterness_val = max(0, min(10, bitterness_val))  # przycinamy do zakresu
+                print(f"    ✓  Skorygowano do: {bitterness_val}")
+                valid = False
+            else:
+                print(f"    ✓  Gorzkość w zakresie")
+            
+            # Sprawdzamy kwasowość
+            if not (0 <= acidity_val <= 10):
+                print(f"    ⚠️  UWAGA: Kwasowość poza zakresem [0-10]: {acidity_val}")
+                acidity_val = max(0, min(10, acidity_val))
+                print(f"    ✓  Skorygowano do: {acidity_val}")
+                valid = False
+            else:
+                print(f"    ✓  Kwasowość w zakresie")
+            
+            # Sprawdzamy aromat
+            if not (0 <= aroma_val <= 10):
+                print(f"    ⚠️  UWAGA: Aromat poza zakresem [0-10]: {aroma_val}")
+                aroma_val = max(0, min(10, aroma_val))
+                print(f"    ✓  Skorygowano do: {aroma_val}")
+                valid = False
+            else:
+                print(f"    ✓  Aromat w zakresie")
+            
+            # Sprawdzamy temperaturę
+            if not (60 <= temperature_val <= 95):
+                print(f"    ⚠️  UWAGA: Temperatura poza zakresem [60-95]: {temperature_val}")
+                temperature_val = max(60, min(95, temperature_val))
+                print(f"    ✓  Skorygowano do: {temperature_val}")
+                valid = False
+            else:
+                print(f"    ✓  Temperatura w zakresie")
+            
+            if valid:
+                print("    ✓  Wszystkie wartości w poprawnych zakresach")
+            
+            # === KROK 3: Wrzucamy wartości do symulatora ===
+            print("\n[3] USTAWIANIE WARTOŚCI W SYMULATORZE:")
+            self.simulator.input['bitterness'] = bitterness_val
+            print(f"    ✓  Ustawiono gorzkość: {bitterness_val}")
+            
+            self.simulator.input['acidity'] = acidity_val
+            print(f"    ✓  Ustawiono kwasowość: {acidity_val}")
+            
+            self.simulator.input['aroma'] = aroma_val
+            print(f"    ✓  Ustawiono aromat: {aroma_val}")
+            
+            self.simulator.input['temperature'] = temperature_val
+            print(f"    ✓  Ustawiono temperaturę: {temperature_val}")
+            
+            # === KROK 4: Obliczamy wynik ===
+            print("\n[4] OBLICZANIE WYJŚCIA (DEFUZZYFIKACJA):")
+            print("    Uruchamianie systemu rozmytego...")
+            
+            # DIAGNOSTYKA - sprawdzamy co się dzieje pod maską
+            print("\n    [DIAGNOSTYKA] Sprawdzanie stopni przynależności przed obliczeniem:")
+            self._check_rule_activation(bitterness_val, acidity_val, aroma_val, temperature_val)
+            
+            # compute() = główne obliczenie - "odpala" cały system rozmyty
+            try:
+                self.simulator.compute()
+                print("    ✓  Obliczenia zakończone pomyślnie")
+            except KeyError as e:
+                # To się wydarzy jeśli ŻADNA reguła się nie uruchomiła
+                print(f"\n    ⚠️  Brak aktywacji reguł dla danych wejściowych!")
+                print(f"    System nie może obliczyć wartości - używam wartości domyślnej")
+                return 25.0  # zwracamy 25 = bardzo słaba kawa
+            
+            # Sprawdzamy czy wynik faktycznie jest
+            if 'quality' not in self.simulator.output:
+                print("\n    ⚠️  UWAGA: Brak klucza 'quality' w output!")
+                print(f"    Dostępne klucze: {list(self.simulator.output.keys())}")
+                print("    Zwracam wartość domyślną: 25.0")
+                return 25.0
+            
+            # === KROK 5: Pobieramy i pokazujemy wynik ===
+            quality_result = self.simulator.output['quality']
+            print(f"\n[5] WYNIK:")
+            print(f"    Jakość kawy: {quality_result:.2f}/100")
+            
+            # Tłumaczymy liczbę na słowa (np. 85 = "Bardzo dobra")
+            quality_label = self.get_quality_label(quality_result)
+            print(f"    Kategoria: {quality_label}")
+            
+            # === KROK 6: Wyjaśnienie dla użytkownika ===
+            print("\n[6] WYJAŚNIENIE WYNIKU:")
+            explanation = self.explain_result(bitterness_val, acidity_val, aroma_val, temperature_val, quality_result)
+            print(explanation)
+            
+            # === KROK 7: Dodatkowe info dla ciekawskich ===
+            print("\n[7] DODATKOWE INFORMACJE:")
+            self._log_activation_details(bitterness_val, acidity_val, aroma_val, temperature_val)
+            
+            print("\n" + "="*70)
+            print("ZAKOŃCZENIE OCENY - SUKCES")
+            print("="*70 + "\n")
+            
+            return quality_result
+        
+        except Exception as e:
+            # Coś poszło bardzo nie tak - łapiemy błąd i pokazujemy co się stało
+            print("\n" + "!"*70)
+            print("BŁĄD PODCZAS OBLICZANIA JAKOŚCI")
+            print("!"*70)
+            print(f"\nTyp błędu: {type(e).__name__}")
+            print(f"Komunikat: {str(e)}")
+            print(f"\nWartości wejściowe w momencie błędu:")
+            print(f"  - Gorzkość: {bitterness_val}")
+            print(f"  - Kwasowość: {acidity_val}")
+            print(f"  - Aromat: {aroma_val}")
+            print(f"  - Temperatura: {temperature_val}")
+            
+            # Pełny stack trace dla debugowania
+            import traceback
+            print("\nPełny stack trace:")
+            traceback.print_exc()
+            
+            print("\n" + "!"*70)
+            print("ZWRACANIE WARTOŚCI DOMYŚLNEJ: 50.0")
+            print("!"*70 + "\n")
+            
+            return 50.0  # awaryjny return - średnia kawa
+    
+    def _check_rule_activation(self, bitterness_val, acidity_val, aroma_val, temperature_val):
+        """
+        Funkcja diagnostyczna - sprawdza czy reguły w ogóle się uruchomią.
+        
+        Dla każdej zmiennej oblicza "stopień przynależności" do kategorii.
+        Np. gorzkość 3.5 może być:
+        - 70% "low" (niska)
+        - 30% "medium" (średnia)
+        - 0% "high" (wysoka)
+        
+        Jeśli wszystkie stopnie = 0, to żadna reguła się nie uruchomi = problem!
+        """
+        try:
+            # interp_membership = oblicza stopień przynależności dla konkretnej wartości
+            # Sprawdzamy gorzkość
+            bit_low = fuzz.interp_membership(self.bitterness.universe, self.bitterness['low'].mf, bitterness_val)
+            bit_med = fuzz.interp_membership(self.bitterness.universe, self.bitterness['medium'].mf, bitterness_val)
+            bit_high = fuzz.interp_membership(self.bitterness.universe, self.bitterness['high'].mf, bitterness_val)
+            
+            # Sprawdzamy kwasowość
+            aci_low = fuzz.interp_membership(self.acidity.universe, self.acidity['low'].mf, acidity_val)
+            aci_med = fuzz.interp_membership(self.acidity.universe, self.acidity['medium'].m
