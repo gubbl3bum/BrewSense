@@ -1,0 +1,43 @@
+Przeanalizuj dokładnie przesłany przeze mnie kod źródłowy (bez zmieniania istniejącej logiki, chyba że jest to konieczne).
+
+Na jego podstawie:
+
+Dodaj predefiniowane profile kawy, np.:
+
+-Espresso
+
+-Americano
+
+-Latte
+
+-Cappuccino
+
+Każdy profil powinien zawierać sensowne, realistyczne parametry (np. ilość wody, czas ekstrakcji, intensywność, temperatura – w zależności od kontekstu aplikacji).
+
+Dodaj mechanizm wyjaśniania wyników, tzn. krótką informację tekstową opisującą:
+
+dlaczego dany profil został wybrany
+
+co oznaczają uzyskane parametry / wynik działania algorytmu
+
+Implementacja ma być czytelna, modularna i zgodna ze stylem istniejącego kodu.
+
+NIE zwracaj całego pliku ani całego projektu.
+
+Zwróć WYŁĄCZNIE nowo dodany lub zmodyfikowany kod, podzielony na sekcje:
+
+„Kod do dodania”
+
+„Kod do modyfikacji”
+
+Przy każdej sekcji dokładnie napisz, gdzie należy wkleić kod, np.:
+
+„Wstaw poniższy kod nad funkcją X”
+
+„Dodaj do pliku Y, wewnątrz klasy Z”
+
+„Zastąp istniejącą funkcję A poniższą implementacją”
+
+Nie dodawaj komentarzy typu „reszta bez zmian” ani ogólnych opisów — tylko konkretne instrukcje i kod.
+
+okej dziala ale kiedy wybieram kawe predefiniowana to zmieniaja sie tylko polozenia suwakow ale nie wartosci które są reprezentowane przez suwaki
