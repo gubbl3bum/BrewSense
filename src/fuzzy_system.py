@@ -550,6 +550,58 @@ class CoffeeQualitySystem:
             return "Bardzo dobra"
         else:
             return "Wybitna!"
+
+    def explain_result(self, bitterness, acidity, aroma, temperature, quality):
+        """
+        Generuje szczegółowe wyjaśnienie tekstowe wyniku dla użytkownika.
+
+        Args:
+            bitterness (float): Gorzkość (0-10)
+            acidity (float): Kwasowość (0-10)
+            aroma (float): Aromat (0-10)
+            temperature (float): Temperatura (°C)
+            quality (float): Obliczona jakość (0-100)
+
+        Returns:
+            str: Tekst sformatowany z wyjaśnieniem.
+        """
+        explanation = []
+        explanation.append("=== SZCZEGÓŁOWA ANALIZA WYNIKU ===\n")
+
+        # 1. Analiza aromatu (najważniejszy parametr)
+        if aroma >= 7.5:
+            explanation.append(f"• AROMAT: Silny ({aroma:.1f}). To kluczowy atut tej kawy, znacząco podnoszący ocenę.")
+        elif aroma <= 3.5:
+            explanation.append(f"• AROMAT: Słaby ({aroma:.1f}). Brak wyczuwalnego bukietu drastycznie obniża jakość.")
+        else:
+            explanation.append(f"• AROMAT: Umiarkowany ({aroma:.1f}). Poprawny, ale nie wyróżniający się.")
+
+        # 2. Analiza balansu smaku
+        if 4.0 <= bitterness <= 6.0 and 4.0 <= acidity <= 6.0:
+            explanation.append(
+                f"• BALANS: Idealna równowaga między goryczą ({bitterness:.1f}) a kwasowością ({acidity:.1f}).")
+        else:
+            if bitterness > 7.0:
+                explanation.append(f"• SMAK: Dominująca gorycz ({bitterness:.1f}) tłumi inne nuty smakowe.")
+            if acidity > 7.0:
+                explanation.append(f"• SMAK: Wysoka kwasowość ({acidity:.1f}) może być postrzegana jako cierpkość.")
+
+        # 3. Analiza temperatury
+        if 75 <= temperature <= 85:
+            explanation.append(
+                f"• TEMPERATURA: Optymalna ({temperature:.1f}°C). Pozwala na pełne uwolnienie walorów smakowych.")
+        elif temperature > 90:
+            explanation.append(
+                f"• TEMPERATURA: Zbyt wysoka ({temperature:.1f}°C). Ryzyko 'przeparzenia' i utraty delikatnych nut.")
+        elif temperature < 70:
+            explanation.append(
+                f"• TEMPERATURA: Zbyt niska ({temperature:.1f}°C). Kawa może wydawać się płaska w smaku.")
+
+        # 4. Podsumowanie wyniku
+        label = self.get_quality_label(quality)
+        explanation.append(f"\n=> PODSUMOWANIE: Wynik {quality:.1f}/100 wskazuje na kawę kategorii '{label}'.")
+
+        return "\n".join(explanation)
     
     def get_variables(self):
         """
