@@ -16,6 +16,10 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                              QHBoxLayout, QLabel, QSlider, QPushButton,
+                              QFrame, QGridLayout, QSplitter, QSizePolicy,
+                              QComboBox, QMessageBox)
 
 try:
     from fuzzy_system import CoffeeQualitySystem
@@ -45,6 +49,34 @@ COLORS = {
     'button_secondary': '#8B4513',# Sienna
     'text_dark': '#2F1E15',       # Ciemny brąz
     'accent': '#CD853F',          # Peru
+}
+
+# Predefiniowane profile kawy z opisem (Why chosen) i parametrami
+COFFEE_PROFILES = {
+    "Własny (Manualny)": {
+        "desc": "Ręczne ustawienia parametrów przez użytkownika.",
+        "params": None
+    },
+    "Espresso Italiano": {
+        "desc": "Klasyczne włoskie espresso. Mała objętość, wysoka intensywność i gęsta crema.",
+        "params": {"bitterness": 8.0, "acidity": 3.0, "aroma": 9.0, "temperature": 90.0}
+    },
+    "Americano": {
+        "desc": "Espresso przedłużone gorącą wodą. Łagodniejszy smak, wyższa temperatura serwowania.",
+        "params": {"bitterness": 4.5, "acidity": 4.0, "aroma": 6.0, "temperature": 94.0}
+    },
+    "Cappuccino": {
+        "desc": "Balans między kawą a spienionym mlekiem. Niższa temperatura i łagodniejsza gorycz.",
+        "params": {"bitterness": 3.5, "acidity": 2.5, "aroma": 7.0, "temperature": 70.0}
+    },
+    "Flat White": {
+        "desc": "Podwójne espresso z mlekiem. Wyższa intensywność niż Latte, aksamitna tekstura.",
+        "params": {"bitterness": 6.0, "acidity": 3.5, "aroma": 8.0, "temperature": 75.0}
+    },
+    "Cold Brew": {
+        "desc": "Kawa parzona na zimno. Bardzo niska kwasowość, specyficzny profil smakowy.",
+        "params": {"bitterness": 2.0, "acidity": 1.5, "aroma": 5.0, "temperature": 60.0} # Min slidera to 60
+    }
 }
 
 # Style QSS dla profesjonalnego wyglądu
@@ -549,7 +581,47 @@ class CoffeeGUI(QMainWindow):
         layout.addWidget(title)
         
         layout.addSpacing(20)
-        
+
+        """Tworzenie lewego panelu z suwakami i wyborem profilu"""
+        panel = QFrame()
+        panel.setStyleSheet(f"background-color: {COLORS['panel_left']}; border-radius: 10px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
+
+        # Tytuł
+        title = QLabel("Parametry Kawy")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        layout.addSpacing(10)
+
+        # --- SEKACJA PROFILI (DODANO) ---
+        profile_label = QLabel("Wybierz profil kawy:")
+        profile_label.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        layout.addWidget(profile_label)
+
+        self.profile_combo = QComboBox()
+        self.profile_combo.addItems(COFFEE_PROFILES.keys())
+        self.profile_combo.setStyleSheet("""
+                    QComboBox {
+                        padding: 8px;
+                        border: 1px solid #8B6F47;
+                        border-radius: 5px;
+                        background-color: #FFF8E7;
+                        font-size: 13px;
+                    }
+                """)
+        self.profile_combo.currentTextChanged.connect(self.load_profile)
+        layout.addWidget(self.profile_combo)
+
+        self.profile_desc_label = QLabel("Ręczne ustawienia parametrów.")
+        self.profile_desc_label.setWordWrap(True)
+        self.profile_desc_label.setStyleSheet("font-size: 11px; font-style: italic; color: #4A3728;")
+        layout.addWidget(self.profile_desc_label)
+        layout.addSpacing(10)
+
         # Suwaki
         self.bitterness_slider, self.bitterness_label = self._create_slider(
             layout, "Gorzkość (Bitterness):", 0, 100, 50,
@@ -637,6 +709,27 @@ class CoffeeGUI(QMainWindow):
         layout.addWidget(frame)
         
         return slider, value_label
+
+    def load_profile(self, profile_name):
+        """Ładuje parametry dla wybranego profilu kawy"""
+        data = COFFEE_PROFILES[profile_name]
+
+        # Aktualizacja opisu
+        self.profile_desc_label.setText(data["desc"])
+
+        # Jeśli wybrano profil z parametrami (nie "Własny")
+        if data["params"]:
+            params = data["params"]
+
+            # Ustawiamy wartości bezpośrednio - usunięto blockSignals,
+            # dzięki czemu etykiety liczbowe (np. "8.0") zaktualizują się automatycznie
+            self.bitterness_slider.setValue(int(params["bitterness"] * 10))
+            self.acidity_slider.setValue(int(params["acidity"] * 10))
+            self.aroma_slider.setValue(int(params["aroma"] * 10))
+            self.temperature_slider.setValue(int(params["temperature"] * 10))
+
+            # Wymuszamy ocenę kawy po załadowaniu profilu, aby zaktualizować wykresy i wynik
+            self.evaluate_coffee()
     
     def _create_middle_panel(self):
         """Tworzenie środkowego panelu z wykresami"""
@@ -705,7 +798,21 @@ class CoffeeGUI(QMainWindow):
         self.description_label.setMinimumWidth(200)
         self.description_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.description_label)
-        
+
+        report_btn = QPushButton("📋 Raport")
+        report_btn.setToolTip("Pokaż szczegółowe wyjaśnienie wyniku")
+        report_btn.setCursor(Qt.PointingHandCursor)
+        report_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFF8E7; 
+                        border: 2px solid #6F4E37;
+                        padding: 10px 15px;
+                    }
+                    QPushButton:hover { background-color: #FFFFFF; }
+                """)
+        report_btn.clicked.connect(self.show_explanation_dialog)
+        layout.addWidget(report_btn)
+
         return panel
     
     def _initialize_plots(self):
@@ -788,6 +895,8 @@ class CoffeeGUI(QMainWindow):
     
     def reset_values(self):
         """Reset wartości"""
+        self.profile_combo.setCurrentIndex(0)  # Ustawia "Własny"
+
         self.bitterness_slider.setValue(50)
         self.acidity_slider.setValue(50)
         self.aroma_slider.setValue(50)
@@ -803,6 +912,33 @@ class CoffeeGUI(QMainWindow):
         
         self.result_label.setText("Wynik: 0.0/100")
         self.description_label.setText("")
+
+    def show_explanation_dialog(self):
+        """Wyświetla okno dialogowe ze szczegółowym wyjaśnieniem wyniku"""
+        # Pobranie aktualnych wartości
+        bitterness = self.bitterness_slider.value() / 10
+        acidity = self.acidity_slider.value() / 10
+        aroma = self.aroma_slider.value() / 10
+        temperature = self.temperature_slider.value() / 10
+
+        # Pobranie tekstu wyjaśnienia z systemu rozmytego
+        explanation = self.fuzzy_system.explain_result(
+            bitterness, acidity, aroma, temperature, self.current_quality
+        )
+
+        # Dodanie informacji o wybranym profilu
+        current_profile = self.profile_combo.currentText()
+        profile_info = f"PROFIL: {current_profile}\n{COFFEE_PROFILES[current_profile]['desc']}\n\n"
+
+        full_text = profile_info + explanation
+
+        # Wyświetlenie MessageBox
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Raport Jakości Kawy - BrewSense")
+        msg_box.setText(full_text)
+        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setStyleSheet(f"background-color: {COLORS['background']}; color: {COLORS['text_dark']};")
+        msg_box.exec_()
 
 
 def main():
