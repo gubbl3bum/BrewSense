@@ -387,6 +387,12 @@ class CoffeeGUI(QMainWindow):
         # Zmniejszone marginesy dla oszczędności miejsca
         layout.setContentsMargins(5, 5, 5, 5)
 
+        # Dodanie nagłówka
+        title = QLabel("Funkcje Przynależności")
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
         self.plot_canvas = MplCanvas(panel)
         layout.addWidget(self.plot_canvas)
         return panel
@@ -395,6 +401,12 @@ class CoffeeGUI(QMainWindow):
         panel = QFrame()
         panel.setStyleSheet(f"background-color: {COLORS['panel_right']};")
         layout = QVBoxLayout(panel)
+
+        # Dodanie nagłówka
+        title = QLabel("Wizualizacja Jakości")
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
 
         self.visualizer = CoffeeVisualizer()
         # Dodajemy visualizer z Expanding policy
