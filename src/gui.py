@@ -287,7 +287,31 @@ class CoffeeGUI(QMainWindow):
         self.fuzzy_system = CoffeeQualitySystem()
         self.current_quality = 0
         self.setStyleSheet(QSS_STYLE)
+
+        # Ustawienie ikony z emoji/tekstu
+        self.setWindowIcon(self._create_text_icon("☕"))
+
         self._create_widgets()
+
+    def _create_text_icon(self, text):
+        """Tworzy ikonę z tekstu/emoji z przezroczystym tłem"""
+        from PyQt5.QtGui import QPixmap, QIcon
+        
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.transparent)  # Przezroczyste tło zamiast koloru
+        
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.TextAntialiasing)  # Lepsze wygładzanie tekstu
+        
+        font = QFont("Segoe UI Emoji", 36)
+        painter.setFont(font)
+        painter.setPen(QColor(COLORS['text_dark']))
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, text)
+        
+        painter.end()
+        
+        return QIcon(pixmap)
 
     def _create_widgets(self):
         central = QWidget()

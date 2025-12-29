@@ -1,0 +1,3 @@
+Na podstawie przesłanego kodu źródłowego, dodaj brakujące nagłówki do paneli (środkowy panel - "Funkcje przynależności", prawy panel - "Wizualizacja jakości").
+Chciałbym również dodać ikonkę kubka kawy (emoji) z przezroczystym tłem jako ikonkę aplikacji.
+Pokaż mi gdzie mam wprowadzić zmiany.
